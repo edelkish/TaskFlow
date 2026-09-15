@@ -1,0 +1,247 @@
+@page "/grupos"
+@inherits TaskFlow.Blazor.Components.AuthenticatedPageBase
+@inject TaskFlow.Blazor.Services.ApiClient Api
+
+<PageTitle>Grupos de tareas</PageTitle>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title">
+                    <i class="bi bi-diagram-3 me-2"></i>Grupos de tareas
+                    @if (Selected != null)
+                    {
+                        <span class="text-secondary fs-6"> — @Selected.Name</span>
+                    }
+                </h3>
+                <div class="d-flex gap-2 align-items-center">
+                    <select class="form-select form-select-sm" style="min-width: 220px" @bind="SelectedPeriodId" @bind:after="LoadAsync">
+                        <option value="">Todos los periodos</option>
+                        @foreach (var p in Periods ?? new())
+                        {
+                            <option value="@p.Id">@p.Name — @p.Year @(new System.Globalization.CultureInfo("es-ES").DateTimeFormat.GetMonthName(p.Month))</option>
+                        }
+                    </select>
+                    <button class="btn btn-sm btn-primary" @onclick="() => ShowCreate = true">
+                        <i class="bi bi-plus-lg me-1"></i> Nuevo grupo
+                    </button>
+                </div>
+            </div>
+
+            <div class="card-body">
+                @if (Error != null)
+                {
+                    <div class="alert alert-danger">@Error</div>
+                }
+
+                @if (ShowCreate)
+                {
+                    <div class="card card-outline card-primary mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title mb-3"><i class="bi bi-plus-circle me-1"></i>Crear grupo de tareas</h6>
+                            <div class="row g-2">
+                                <div class="col-md-3">
+                                    <label class="form-label">Periodo</label>
+                                    <select class="form-select" @bind="NewPeriodId">
+                                        <option value="">Seleccione periodo...</option>
+                                        @foreach (var p in Periods ?? new())
+                                        {
+                                            <option value="@p.Id">@($"{p.Name} — {p.Year} {new System.Globalization.CultureInfo("es-ES").DateTimeFormat.GetMonthName(p.Month)}")</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Dev</label>
+                                    <select class="form-select" @bind="NewDevId">
+                                        <option value="">—</option>
+                                        @foreach (var per in People ?? new())
+                                        {
+                                            <option value="@per.Id">@per.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Team Lead</label>
+                                    <select class="form-select" @bind="NewTeamLeadId">
+                                        <option value="">—</option>
+                                        @foreach (var per in People ?? new())
+                                        {
+                                            <option value="@per.Id">@per.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">QA</label>
+                                    <select class="form-select" @bind="NewQaId">
+                                        <option value="">—</option>
+                                        @foreach (var per in People ?? new())
+                                        {
+                                            <option value="@per.Id">@per.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <button class="btn btn-primary btn-sm" disabled="@Busy" @onclick="CreateGroupAsync">
+                                    <i class="bi bi-check-lg me-1"></i> Guardar
+                                </button>
+                                <button class="btn btn-secondary btn-sm" @onclick="() => ShowCreate = false">Cancelar</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <div class="row">
+                    @if (Groups == null || Groups.Count == 0)
+                    {
+                        <div class="col-12 text-center text-secondary py-4">
+                            No hay grupos. Importe un TXT o cree un grupo manualmente.
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var g in Groups!)
+                        {
+                            <div class="col-md-6 col-xl-4">
+                                <div class="card card-outline @(g.IsQaOnly ? "card-warning" : "card-primary") mb-3">
+                                    <div class="card-header">
+                                        <h3 class="card-title">
+                                            @(g.IsQaOnly ? "QA" : (g.ProjectName ?? "Dev"))
+                                        </h3>
+                                        <div class="card-tools">
+                                            <span class="badge text-bg-secondary">@g.Tasks.Count tareas</span>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="list-unstyled mb-3">
+                                            @if (g.ProjectName != null)
+                                            {
+                                                <li><i class="bi bi-folder2 me-1 text-secondary"></i>@g.ProjectName</li>
+                                            }
+                                            @if (g.IsQaOnly)
+                                            {
+                                                <li><i class="bi bi-person-check me-1 text-warning"></i><strong>QA:</strong> @(g.QaName ?? "—")</li>
+                                            }
+                                            else
+                                            {
+                                                <li><i class="bi bi-code-slash me-1 text-primary"></i><strong>Dev:</strong> @(g.DevName ?? "—")</li>
+                                                <li><i class="bi bi-person-check me-1 text-info"></i><strong>Team Lead:</strong> @(g.TeamLeadName ?? "—")</li>
+                                            }
+                                        </ul>
+                                        <a class="btn btn-sm btn-block btn-outline-primary" href="tareas?grupo=@g.Id">
+                                            <i class="bi bi-list-check me-1"></i> Ver tareas
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<TaskFlow.Application.DTOs.PeriodDto>? Periods { get; set; }
+    private List<TaskFlow.Application.DTOs.PersonDto>? People { get; set; }
+    private List<TaskFlow.Application.DTOs.TaskGroupDto>? Groups { get; set; }
+    private TaskFlow.Application.DTOs.PeriodDto? Selected { get; set; }
+    private string SelectedPeriodId { get; set; } = string.Empty;
+    private bool ShowCreate { get; set; }
+    private string NewPeriodId { get; set; } = string.Empty;
+    private string? NewDevId { get; set; }
+    private string? NewTeamLeadId { get; set; }
+    private string? NewQaId { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var periodo = query["periodo"];
+        if (!string.IsNullOrWhiteSpace(periodo))
+        {
+            SelectedPeriodId = periodo;
+        }
+
+        await LoadBaseAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadBaseAsync()
+    {
+        try
+        {
+            Periods = await Api.GetPeriodsAsync();
+            People = await Api.GetPeopleAsync();
+        }
+        catch
+        {
+            Periods = new();
+            People = new();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        Error = null;
+        try
+        {
+            if (Guid.TryParse(SelectedPeriodId, out var periodId))
+            {
+                Groups = await Api.GetGroupsByPeriodAsync(periodId);
+                Selected = Periods?.FirstOrDefault(p => p.Id == periodId);
+            }
+            else
+            {
+                Groups = await Api.GetGroupsAsync();
+                Selected = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Groups = new();
+            Error = ex.Message;
+        }
+    }
+
+    private async Task CreateGroupAsync()
+    {
+        if (!Guid.TryParse(NewPeriodId, out var periodId))
+        {
+            Error = "Seleccione el periodo.";
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        try
+        {
+            await Api.CreateGroupAsync(new TaskFlow.Application.DTOs.CreateTaskGroupDto
+            {
+                PeriodId = periodId,
+                DevPersonId = ParseId(NewDevId),
+                TeamLeadPersonId = ParseId(NewTeamLeadId),
+                QaPersonId = ParseId(NewQaId)
+            });
+            ShowCreate = false;
+            NewPeriodId = string.Empty;
+            NewDevId = NewTeamLeadId = NewQaId = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private static Guid? ParseId(string? value)
+        => Guid.TryParse(value, out var id) ? id : null;
+}

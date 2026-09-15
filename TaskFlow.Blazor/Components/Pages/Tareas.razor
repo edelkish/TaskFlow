@@ -1,0 +1,364 @@
+@page "/tareas"
+@inherits TaskFlow.Blazor.Components.AuthenticatedPageBase
+@inject TaskFlow.Blazor.Services.ApiClient Api
+
+<PageTitle>Tareas</PageTitle>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title"><i class="bi bi-list-check me-2"></i>Tareas del grupo</h3>
+                @if (Group != null)
+                {
+                    <span class="badge text-bg-secondary">@Group.PeriodName</span>
+                }
+            </div>
+            <div class="card-body">
+                @if (Error != null)
+                {
+                    <div class="alert alert-danger">@Error</div>
+                }
+
+                @if (Group != null)
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-3"><i class="bi bi-code-slash me-1 text-primary"></i><strong>Dev:</strong> @(Group.DevName ?? "—")</div>
+                        <div class="col-md-3"><i class="bi bi-person-check me-1 text-info"></i><strong>Team Lead:</strong> @(Group.TeamLeadName ?? "—")</div>
+                        <div class="col-md-3"><i class="bi bi-person-check me-1 text-warning"></i><strong>QA:</strong> @(Group.QaName ?? "—")</div>
+                        <div class="col-md-3">
+                            <button class="btn btn-sm btn-primary" @onclick="() => ShowCreate = true">
+                                <i class="bi bi-plus-lg me-1"></i> Nueva tarea
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (ShowCreate)
+                    {
+                        <div class="card card-outline card-primary mb-3">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">Nueva tarea</h6>
+                                <div class="row g-2">
+                                    <div class="col-md-1"><label class="form-label">Nº</label>
+                                        <input type="number" class="form-control" @bind="NewNumber" />
+                                    </div>
+                                    <div class="col-md-1"><label class="form-label">Sub</label>
+                                        <input type="number" class="form-control" placeholder="—" @bind="NewSubNumber" />
+                                    </div>
+                                    <div class="col-md-5"><label class="form-label">Descripción</label>
+                                        <input type="text" class="form-control" @bind="NewDescription" />
+                                    </div>
+                                    <div class="col-md-3"><label class="form-label">Asignar a</label>
+                                        <select class="form-select" @bind="NewAssignedId">
+                                            <option value="">Sin asignar</option>
+                                            @foreach (var m in GroupMembers)
+                                            {
+                                                <option value="@m.Key">@m.Value</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button class="btn btn-primary btn-sm" disabled="@Busy" @onclick="CreateTaskAsync">
+                                            <i class="bi bi-check-lg me-1"></i> Guardar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th style="width: 90px">Nº</th>
+                                    <th>Descripción</th>
+                                    <th style="width: 180px">Asignado</th>
+                                    <th style="width: 90px">Origen</th>
+                                    <th class="text-end" style="width: 160px">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Group.Tasks.Count == 0)
+                                {
+                                    <tr><td colspan="5" class="text-center text-secondary">Este grupo no tiene tareas.</td></tr>
+                                }
+                                else
+                                {
+                                    @foreach (var t in Group.Tasks.OrderBy(x => x.Number).ThenBy(x => x.SubNumber ?? 0))
+                                    {
+                                        <tr>
+                                            <td>
+                                                @if (t.SubNumber.HasValue)
+                                                {
+                                                    <span class="text-secondary">@t.Number.@t.SubNumber</span>
+                                                }
+                                                else
+                                                {
+                                                    <strong>@t.Number</strong>
+                                                }
+                                            </td>
+                                            <td>@t.Description</td>
+                                            <td>
+                                                <select class="form-select form-select-sm" value="@(t.AssignedPersonId?.ToString() ?? "")" @onchange="(e) => ReassignAsync(t, e.Value?.ToString())">
+                                                    <option value="">Sin asignar</option>
+                                                    @foreach (var m in GroupMembers)
+                                                    {
+                                                        <option value="@m.Key">@m.Value</option>
+                                                    }
+                                                </select>
+                                            </td>
+                                            <td>
+                                                @if (t.Source == TaskFlow.Domain.Enums.TaskSource.Import)
+                                                {
+                                                    <span class="badge text-bg-warning">Importada</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge text-bg-secondary">Manual</span>
+                                                }
+                                            </td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-primary" @onclick="() => ToggleEdit(t)">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(t)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        @if (EditTask != null && EditTask.Id == t.Id)
+                                        {
+                                            <tr>
+                                                <td colspan="5">
+                                                    <div class="row g-2">
+                                                        <div class="col-md-1">
+                                                            <input type="number" class="form-control form-control-sm" @bind="EditNumber" />
+                                                        </div>
+                                                        <div class="col-md-1">
+                                                            <input type="number" class="form-control form-control-sm" placeholder="Sub" @bind="EditSubNumber" />
+                                                        </div>
+                                                        <div class="col-md-5">
+                                                            <input type="text" class="form-control form-control-sm" @bind="EditDescription" />
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <select class="form-select form-select-sm" @bind="EditAssignedId">
+                                                                <option value="">Sin asignar</option>
+                                                                @foreach (var m in GroupMembers)
+                                                                {
+                                                                    <option value="@m.Key">@m.Value</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-2">
+                                                            <button class="btn btn-sm btn-success" @onclick="() => SaveEditAsync(t)">
+                                                                <i class="bi bi-check-lg"></i>
+                                                            </button>
+                                                            <button class="btn btn-sm btn-secondary ms-1" @onclick="CancelEdit">
+                                                                <i class="bi bi-x-lg"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center text-secondary py-4">
+                        Seleccione un grupo desde la pantalla <a href="grupos">Grupos de tareas</a>.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private Guid GroupId { get; set; } = Guid.Empty;
+    private TaskFlow.Application.DTOs.TaskGroupDto? Group { get; set; }
+    private List<TaskFlow.Application.DTOs.PersonDto>? People { get; set; }
+    private Dictionary<string, string> GroupMembers { get; set; } = new();
+    private bool ShowCreate { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+
+    private int NewNumber { get; set; } = 1;
+    private int? NewSubNumber { get; set; }
+    private string NewDescription { get; set; } = string.Empty;
+    private string NewAssignedId { get; set; } = string.Empty;
+
+    private TaskFlow.Application.DTOs.PlanningTaskDto? EditTask { get; set; }
+    private int EditNumber { get; set; }
+    private int? EditSubNumber { get; set; }
+    private string EditDescription { get; set; } = string.Empty;
+    private string EditAssignedId { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        if (Guid.TryParse(query["grupo"], out var id))
+        {
+            GroupId = id;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Error = null;
+        try
+        {
+            People = await Api.GetPeopleAsync();
+            if (GroupId != Guid.Empty)
+            {
+                Group = await Api.GetGroupAsync(GroupId);
+                GroupMembers = BuildMembers();
+            }
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+    }
+
+    private Dictionary<string, string> BuildMembers()
+    {
+        var dict = new Dictionary<string, string>();
+        void Add(Guid? id, string name, string label)
+        {
+            if (id.HasValue)
+            {
+                dict[id.Value.ToString()] = $"{label} — {name}";
+            }
+        }
+        Add(Group!.DevPersonId, Group.DevName ?? "Dev", "Dev");
+        Add(Group.TeamLeadPersonId, Group.TeamLeadName ?? "TL", "TL");
+        Add(Group.QaPersonId, Group.QaName ?? "QA", "QA");
+        return dict;
+    }
+
+    private async Task CreateTaskAsync()
+    {
+        if (string.IsNullOrWhiteSpace(NewDescription))
+        {
+            Error = "La descripción es obligatoria.";
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        try
+        {
+            await Api.CreateTaskAsync(new TaskFlow.Application.DTOs.CreatePlanningTaskDto
+            {
+                TaskGroupId = GroupId,
+                Number = NewNumber,
+                SubNumber = string.IsNullOrWhiteSpace(NewSubNumber?.ToString()) ? null : NewSubNumber,
+                AssignedPersonId = ParseId(NewAssignedId),
+                Description = NewDescription.Trim()
+            });
+            ShowCreate = false;
+            NewDescription = string.Empty;
+            NewNumber++;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ReassignAsync(TaskFlow.Application.DTOs.PlanningTaskDto task, string? personId)
+    {
+        Error = null;
+        try
+        {
+            await Api.ReassignTaskAsync(task.Id, ParseId(personId));
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+    }
+
+    private void ToggleEdit(TaskFlow.Application.DTOs.PlanningTaskDto task)
+    {
+        if (EditTask?.Id == task.Id)
+        {
+            CancelEdit();
+            return;
+        }
+        EditTask = task;
+        EditNumber = task.Number;
+        EditSubNumber = task.SubNumber;
+        EditDescription = task.Description;
+        EditAssignedId = task.AssignedPersonId?.ToString() ?? string.Empty;
+    }
+
+    private void CancelEdit()
+    {
+        EditTask = null;
+    }
+
+    private async Task SaveEditAsync(TaskFlow.Application.DTOs.PlanningTaskDto task)
+    {
+        if (string.IsNullOrWhiteSpace(EditDescription))
+        {
+            Error = "La descripción es obligatoria.";
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        try
+        {
+            await Api.UpdateTaskAsync(task.Id, new TaskFlow.Application.DTOs.UpdatePlanningTaskDto
+            {
+                Number = EditNumber,
+                SubNumber = string.IsNullOrWhiteSpace(EditSubNumber?.ToString()) ? null : EditSubNumber,
+                AssignedPersonId = ParseId(EditAssignedId),
+                Description = EditDescription.Trim()
+            });
+            CancelEdit();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task DeleteAsync(TaskFlow.Application.DTOs.PlanningTaskDto task)
+    {
+        Error = null;
+        try
+        {
+            await Api.DeleteTaskFromGroupAsync(task.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+    }
+
+    private static Guid? ParseId(string? value)
+        => Guid.TryParse(value, out var id) ? id : null;
+}

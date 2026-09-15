@@ -1,0 +1,183 @@
+@page "/import"
+@inherits TaskFlow.Blazor.Components.AuthenticatedPageBase
+@inject TaskFlow.Blazor.Services.ApiClient Api
+
+<PageTitle>Importar TXT</PageTitle>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="bi bi-box-arrow-down me-2"></i>Importar planificación de tareas</h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label">Ruta del archivo TXT</label>
+                        <input type="text" class="form-control" placeholder="D:\PT 2026\taskAgosto2026.txt" @bind="FilePath" />
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button class="btn btn-primary" disabled="@Busy" @onclick="ImportAsync">
+                            <i class="bi bi-box-arrow-down me-1"></i>
+                            @(Busy ? "Importando..." : "Importar")
+                        </button>
+                    </div>
+                </div>
+
+                @if (Error != null)
+                {
+                    <div class="alert alert-danger mt-3">@Error</div>
+                }
+
+                @if (Result != null)
+                {
+                    <hr />
+                    <h5>Resultado de la importación</h5>
+                    <div class="row text-center mt-3">
+                        <div class="col-3">
+                            <div class="small-box bg-success">@Result.GroupsCreated</div>
+                            <small>Grupos creados</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="small-box bg-info">@Result.GroupsUpdated</div>
+                            <small>Grupos actualizados</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="small-box bg-primary">@Result.TasksImported</div>
+                            <small>Tareas importadas</small>
+                        </div>
+                        <div class="col-3">
+                            <div class="small-box bg-secondary">@Result.TasksRemoved</div>
+                            <small>Tareas sustituidas</small>
+                        </div>
+                    </div>
+
+                    @if (Result.Warnings is { Count: > 0 })
+                    {
+                        <div class="alert alert-warning mt-3">
+                            <strong>Advertencias (@Result.Warnings.Count):</strong>
+                            <ul>
+                                @foreach (var w in Result.Warnings)
+                                {
+                                    <li>@w</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+<button class="btn btn-outline-primary mt-2" @onclick="GoToGrupos">
+                        <i class="bi bi-diagram-3 me-1"></i> Ver grupos del periodo
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="bi bi-clock-history me-2"></i>Historial de importaciones</h3>
+            </div>
+            <div class="card-body table-responsive p-0">
+                <table class="table table-hover table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Periodo</th>
+                            <th>Archivo</th>
+                            <th>Codificación</th>
+                            <th>Estado</th>
+                            <th>Bloques</th>
+                            <th>Tareas</th>
+                            <th>Advertencias</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Batches == null)
+                        {
+                            <tr><td colspan="8" class="text-center text-secondary">Sin importaciones registradas.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var b in Batches)
+                            {
+                                <tr>
+                                    <td>@b.ImportedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>@b.PeriodName</td>
+                                    <td>@b.FileName</td>
+                                    <td>@b.FileEncoding</td>
+                                    <td><span class="badge text-bg-@(BatchBadge(b.Status))">@b.Status</span></td>
+                                    <td>@b.SectionsCount</td>
+                                    <td>@b.TasksCount</td>
+                                    <td>@b.WarningsCount</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string FilePath { get; set; } = string.Empty;
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+    private TaskFlow.Application.DTOs.ImportResultDto? Result { get; set; }
+    private List<TaskFlow.Application.DTOs.ImportBatchDto>? Batches { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBatchesAsync();
+    }
+
+    private async Task LoadBatchesAsync()
+    {
+        try
+        {
+            Batches = await Api.GetImportBatchesAsync();
+        }
+        catch
+        {
+            Batches = new();
+        }
+    }
+
+    private async Task ImportAsync()
+    {
+        if (string.IsNullOrWhiteSpace(FilePath))
+        {
+            Error = "Indique la ruta del archivo TXT.";
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        try
+        {
+            Result = await Api.ImportFileAsync(FilePath.Trim());
+            FilePath = string.Empty;
+            await LoadBatchesAsync();
+        }
+        catch (Exception ex)
+        {
+            Result = null;
+            Error = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void GoToGrupos() => Nav.NavigateTo("/grupos");
+
+    private static string BatchBadge(string status) => status switch
+    {
+        "Success" => "success",
+        "Partial" => "warning",
+        _ => "danger"
+    };
+}

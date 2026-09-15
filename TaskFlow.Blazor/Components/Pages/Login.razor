@@ -1,0 +1,190 @@
+@page "/"
+@page "/login"
+@layout AuthLayout
+@inject TaskFlow.Blazor.Services.AuthState AuthState
+@inject TaskFlow.Blazor.Services.ApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>TaskFlow - Iniciar sesión</PageTitle>
+
+<div class="login-box">
+    <h1 class="login-logo">
+        <a href="/"><b>Task</b>Flow</a>
+    </h1>
+
+    <div class="card">
+        <div class="card-body login-card-body">
+
+            @if (Error != null)
+            {
+                <div class="alert alert-danger mb-3">@Error</div>
+            }
+
+            @if (!IsRegister)
+            {
+                <p class="login-box-msg">Inicie sesión para comenzar su sesión</p>
+
+                <form @onsubmit.prevent="LoginAsync">
+                    <label class="visually-hidden" for="loginEmail">Correo</label>
+                    <div class="input-group mb-3">
+                        <input id="loginEmail" type="email" class="form-control" placeholder="Correo" @bind="Email" />
+                        <div class="input-group-text">
+                            <span class="bi bi-envelope"></span>
+                        </div>
+                    </div>
+
+                    <label class="visually-hidden" for="loginPassword">Contraseña</label>
+                    <div class="input-group mb-3">
+                        <input id="loginPassword" type="password" class="form-control" placeholder="Contraseña" @bind="Password" />
+                        <div class="input-group-text">
+                            <span class="bi bi-lock-fill"></span>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="rememberMe" />
+                                <label class="form-check-label" for="rememberMe">Recuérdame</label>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary" disabled="@Busy">
+                                    @(Busy ? "Entrando..." : "Entrar")
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+
+                <p class="mb-0">
+                    <a href="#" @onclick="() => IsRegister = true" @onclick:preventDefault>Crear una cuenta nueva</a>
+                </p>
+            }
+            else
+            {
+                <p class="login-box-msg">Crear una cuenta nueva</p>
+
+                <form @onsubmit.prevent="RegisterAsync">
+                    <label class="visually-hidden" for="registerName">Nombre completo</label>
+                    <div class="input-group mb-3">
+                        <input id="registerName" type="text" class="form-control" placeholder="Nombre completo" @bind="FullName" />
+                        <div class="input-group-text">
+                            <span class="bi bi-person-fill"></span>
+                        </div>
+                    </div>
+
+                    <label class="visually-hidden" for="registerEmail">Correo</label>
+                    <div class="input-group mb-3">
+                        <input id="registerEmail" type="email" class="form-control" placeholder="Correo" @bind="Email" />
+                        <div class="input-group-text">
+                            <span class="bi bi-envelope"></span>
+                        </div>
+                    </div>
+
+                    <label class="visually-hidden" for="registerPassword">Contraseña</label>
+                    <div class="input-group mb-3">
+                        <input id="registerPassword" type="password" class="form-control" placeholder="Contraseña" @bind="Password" />
+                        <div class="input-group-text">
+                            <span class="bi bi-lock-fill"></span>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="agreeTerms" />
+                                <label class="form-check-label" for="agreeTerms">Acepto los términos</label>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary" disabled="@Busy">
+                                    @(Busy ? "Creando..." : "Crear cuenta")
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+
+                <p class="mb-0">
+                    <a href="#" @onclick="() => IsRegister = false" @onclick:preventDefault>Ya tengo una cuenta</a>
+                </p>
+            }
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool IsRegister { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+    private string FullName { get; set; } = string.Empty;
+    private string Email { get; set; } = string.Empty;
+    private string Password { get; set; } = string.Empty;
+
+    private async Task LoginAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
+        {
+            Error = "Complete todos los campos.";
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        try
+        {
+            if (await AuthState.LoginAsync(Email.Trim(), Password))
+            {
+                Nav.NavigateTo("/dashboard", forceLoad: true);
+            }
+            else
+            {
+                Error = "Credenciales incorrectas.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task RegisterAsync()
+    {
+        if (string.IsNullOrWhiteSpace(FullName) || string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
+        {
+            Error = "Complete todos los campos.";
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        try
+        {
+            var response = await Api.RegisterAsync(new TaskFlow.Application.DTOs.RegisterDto(Email.Trim(), Password, FullName.Trim()));
+            if (response == null)
+            {
+                Error = "No se pudo crear la cuenta.";
+            }
+            else if (await AuthState.LoginAsync(Email.Trim(), Password))
+            {
+                Nav.NavigateTo("/dashboard", forceLoad: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+}

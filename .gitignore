@@ -1,0 +1,24 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+*.nupkg
+
+## Visual Studio
+.vs/
+.vscode/
+[Ww]eb[Uu]ser[Cc]onfig/
+[Tt]est[Rr]esults/
+
+## Build artifacts
+artifacts/
+publish/
+release/
+debug/
+
+## IDE
+.idea/
+*.swp
+*.sln.ide

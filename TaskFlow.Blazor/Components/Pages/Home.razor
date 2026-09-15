@@ -1,0 +1,88 @@
+﻿@page "/dashboard"
+@inherits TaskFlow.Blazor.Components.AuthenticatedPageBase
+@inject TaskFlow.Blazor.Services.ApiClient Api
+
+<PageTitle>Dashboard</PageTitle>
+
+<div class="row">
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-secondary">
+            <div class="inner">
+                <h3>@Periods.Count</h3>
+                <p>Periodos</p>
+            </div>
+            <div class="icon"><i class="bi bi-calendar-month"></i></div>
+            <a href="periodos" class="small-box-footer">Ver todos <i class="bi bi-arrow-right-circle ms-1"></i></a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-primary">
+            <div class="inner">
+                <h3>@Groups.Count</h3>
+                <p>Grupos de tareas</p>
+            </div>
+            <div class="icon"><i class="bi bi-diagram-3"></i></div>
+            <a href="grupos" class="small-box-footer">Ver todos <i class="bi bi-arrow-right-circle ms-1"></i></a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-success">
+            <div class="inner">
+                <h3>@Tasks.Count</h3>
+                <p>Tareas planificadas</p>
+            </div>
+            <div class="icon"><i class="bi bi-list-check"></i></div>
+            <a href="tareas" class="small-box-footer">Gestionar <i class="bi bi-arrow-right-circle ms-1"></i></a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-warning">
+            <div class="inner">
+                <h3>@People.Count</h3>
+                <p>Personas</p>
+            </div>
+            <div class="icon"><i class="bi bi-people"></i></div>
+            <a href="personas" class="small-box-footer">Ver todos <i class="bi bi-arrow-right-circle ms-1"></i></a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="bi bi-box-arrow-down me-2"></i>Importar planificación</h3>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">
+                    Cargue el archivo TXT mensual para crear automáticamente los grupos de trabajo
+                    (Dev / QA / Team Lead) y sus tareas por función.
+                </p>
+                <a class="btn btn-primary" href="import">
+                    <i class="bi bi-upload me-1"></i> Ir a importación
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<TaskFlow.Application.DTOs.PeriodDto> Periods { get; set; } = new();
+    private List<TaskFlow.Application.DTOs.TaskGroupDto> Groups { get; set; } = new();
+    private List<TaskFlow.Application.DTOs.PlanningTaskDto> Tasks { get; set; } = new();
+    private List<TaskFlow.Application.DTOs.PersonDto> People { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Periods = await Api.GetPeriodsAsync() ?? new();
+            Groups = await Api.GetGroupsAsync() ?? new();
+            Tasks = Groups.SelectMany(g => g.Tasks).ToList();
+            People = await Api.GetPeopleAsync() ?? new();
+        }
+        catch
+        {
+        }
+    }
+}
