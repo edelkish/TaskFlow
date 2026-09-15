@@ -9,5 +9,6 @@ public interface IUnitOfWork : IDisposable
     ITaskGroupRepository TaskGroups { get; }
     IPlanningTaskRepository PlanningTasks { get; }
     IImportBatchRepository ImportBatches { get; }
+    IAppSettingRepository AppSettings { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

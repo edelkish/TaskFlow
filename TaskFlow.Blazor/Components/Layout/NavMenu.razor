@@ -1,4 +1,6 @@
-﻿<ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview">
+﻿@inject TaskFlow.Blazor.Services.AuthState AuthState
+
+<ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview">
     <li class="nav-item">
         <NavLink class="nav-link" href="dashboard">
             <i class="nav-icon bi bi-speedometer2"></i>
@@ -47,4 +49,14 @@
             <p>Proyectos</p>
         </NavLink>
     </li>
+
+    @if (AuthState.IsAdmin)
+    {
+        <li class="nav-item">
+            <NavLink class="nav-link" href="configuracion">
+                <i class="nav-icon bi bi-sliders"></i>
+                <p>Configuración</p>
+            </NavLink>
+        </li>
+    }
 </ul>

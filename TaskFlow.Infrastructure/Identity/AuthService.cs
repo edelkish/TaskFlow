@@ -27,8 +27,14 @@ public class AuthService : IAuthService
         if (user == null || !await _userManager.CheckPasswordAsync(user, dto.Password))
             return Result<AuthResponseDto>.Failure("Invalid email or password");
 
-        var token = GenerateJwtToken(user);
-        return Result<AuthResponseDto>.Success(token);
+        var roles = await _userManager.GetRolesAsync(user);
+        var token = GenerateJwtToken(user, roles);
+        return Result<AuthResponseDto>.Success(new AuthResponseDto(
+            token,
+            DateTime.UtcNow.AddMinutes(Convert.ToDouble(_configuration["JwtSettings:ExpirationInMinutes"])),
+            user.Email!,
+            user.Email!,
+            roles.ToList()));
     }
 
     public async Task<Result<AuthResponseDto>> RegisterAsync(RegisterDto dto)
@@ -46,11 +52,17 @@ public class AuthService : IAuthService
             return Result<AuthResponseDto>.Failure(errors);
         }
 
-        var token = GenerateJwtToken(user);
-        return Result<AuthResponseDto>.Success(token);
+        var roles = await _userManager.GetRolesAsync(user);
+        var token = GenerateJwtToken(user, roles);
+        return Result<AuthResponseDto>.Success(new AuthResponseDto(
+            token,
+            DateTime.UtcNow.AddMinutes(Convert.ToDouble(_configuration["JwtSettings:ExpirationInMinutes"])),
+            user.Email!,
+            user.Email!,
+            roles.ToList()));
     }
 
-    private AuthResponseDto GenerateJwtToken(IdentityUser user)
+    private string GenerateJwtToken(IdentityUser user, IList<string> roles)
     {
         var jwtSettings = _configuration.GetSection("JwtSettings");
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Secret"]!));
@@ -63,6 +75,8 @@ public class AuthService : IAuthService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
+        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+
         var token = new JwtSecurityToken(
             issuer: jwtSettings["Issuer"],
             audience: jwtSettings["Audience"],
@@ -71,11 +85,6 @@ public class AuthService : IAuthService
             signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
         );
 
-        return new AuthResponseDto(
-            new JwtSecurityTokenHandler().WriteToken(token),
-            expiration,
-            user.Email!,
-            user.Email!
-        );
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }

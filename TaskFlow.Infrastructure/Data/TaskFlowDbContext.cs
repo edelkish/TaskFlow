@@ -17,6 +17,7 @@ public class TaskFlowDbContext : IdentityDbContext
     public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
     public DbSet<TaskGroup> TaskGroups => Set<TaskGroup>();
     public DbSet<PlanningTask> PlanningTasks => Set<PlanningTask>();
+    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

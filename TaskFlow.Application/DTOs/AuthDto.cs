@@ -15,5 +15,6 @@ public record AuthResponseDto(
     string Token,
     DateTime Expiration,
     string Email,
-    string FullName
+    string FullName,
+    List<string> Roles
 );

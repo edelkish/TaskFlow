@@ -18,6 +18,7 @@ builder.Services.AddHttpClient<ApiClient>(client =>
     .AddHttpMessageHandler<AuthTokenHandler>();
 
 builder.Services.AddScoped<AuthState>();
+builder.Services.AddScoped<ThemeState>();
 
 var app = builder.Build();
 

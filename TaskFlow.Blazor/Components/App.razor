@@ -1,4 +1,5 @@
 ﻿<!DOCTYPE html>
+@inject TaskFlow.Blazor.Services.ThemeState Theme
 <html lang="es" data-bs-theme="light">
 
 <head>
@@ -22,6 +23,7 @@
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="@Assets["lib/bootstrap/dist/js/bootstrap.bundle.min.js"]"></script>
     <script src="@Assets["lib/adminlte/js/adminlte.js"]"></script>
+    <script src="@Assets["js/theme.js"]"></script>
     <script>
         // Re-inicializa los componentes de AdminLTE (sidebar, etc.) cuando Blazor comienza,
         // para recuperar sus controladores de eventos sobre el DOM actual.
@@ -34,3 +36,15 @@
 </body>
 
 </html>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await Theme.InitializeAsync();
+    }
+}

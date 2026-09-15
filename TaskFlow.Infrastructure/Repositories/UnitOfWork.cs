@@ -12,6 +12,7 @@ public class UnitOfWork : IUnitOfWork
     private ITaskGroupRepository? _taskGroups;
     private IPlanningTaskRepository? _planningTasks;
     private IImportBatchRepository? _importBatches;
+    private IAppSettingRepository? _appSettings;
 
     public UnitOfWork(Data.TaskFlowDbContext context)
     {
@@ -38,6 +39,9 @@ public class UnitOfWork : IUnitOfWork
 
     public IImportBatchRepository ImportBatches =>
         _importBatches ??= new ImportBatchRepository(_context);
+
+    public IAppSettingRepository AppSettings =>
+        _appSettings ??= new AppSettingRepository(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

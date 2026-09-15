@@ -232,4 +232,17 @@ public class ApiClient
         var response = await _httpClient.DeleteAsync($"api/people/{id}");
         response = await EnsureSuccessAsync(response);
     }
+
+    // Configuración del sistema
+    public async Task<ThemeSettingsDto?> GetThemeSettingsAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<ThemeSettingsDto>("api/settings", _jsonOptions);
+    }
+
+    public async Task<ThemeSettingsDto?> UpdateThemeSettingsAsync(UpdateThemeSettingsDto dto)
+    {
+        var response = await _httpClient.PutAsJsonAsync("api/settings", dto);
+        response = await EnsureSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<ThemeSettingsDto>(_jsonOptions);
+    }
 }

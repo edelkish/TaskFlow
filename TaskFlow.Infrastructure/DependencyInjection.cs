@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<ITaskGroupRepository, TaskGroupRepository>();
         services.AddScoped<IPlanningTaskRepository, PlanningTaskRepository>();
         services.AddScoped<IImportBatchRepository, ImportBatchRepository>();
+        services.AddScoped<IAppSettingRepository, AppSettingRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // Services
@@ -52,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<IPlanningTaskService, PlanningTaskService>();
         services.AddScoped<IPeriodService, PeriodService>();
         services.AddScoped<IPersonService, PersonService>();
+        services.AddScoped<ISettingsService, SettingsService>();
 
         // Parsing
         services.AddScoped<ITaskFileParser, TxtTaskParser>();
