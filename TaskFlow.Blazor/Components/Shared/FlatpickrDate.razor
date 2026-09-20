@@ -1,0 +1,50 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<input type="text" class="@CssClass" @ref="_input" required="@Required" />
+
+@code {
+    [Parameter] public DateTime? Value { get; set; }
+    [Parameter] public EventCallback<DateTime?> ValueChanged { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public string CssClass { get; set; } = "form-control";
+
+    private ElementReference _input;
+    private DotNetObjectReference<FlatpickrDate>? _selfRef;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        _selfRef = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("taskflow.datepicker.init", _input, _selfRef, Value?.ToString("yyyy-MM-dd"));
+        _initialized = true;
+    }
+
+    [JSInvokable]
+    public async Task OnFlatpickrChange(string? dateStr)
+    {
+        Value = string.IsNullOrWhiteSpace(dateStr) ? null : DateTime.Parse(dateStr);
+        await ValueChanged.InvokeAsync(Value);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_initialized)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("taskflow.datepicker.destroy", _input);
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+        }
+
+        _selfRef?.Dispose();
+    }
+}
