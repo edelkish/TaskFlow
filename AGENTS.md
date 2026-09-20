@@ -26,6 +26,6 @@ Durante el flujo de trabajo se deben usar las siguientes personas de BMAD según
 
 ## Diseño / Plantilla HTML
 
-- Plantilla base del proyecto: `D:\wamp64\www\AdminLTE`
+- Plantilla base del proyecto: `C:\wamp64\www\AdminLTE`
 - Página de referencia: `starter.html`
 - El UI debe basarse en la estructura, componentes y estilos de la plantilla AdminLTE.
