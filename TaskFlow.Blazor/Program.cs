@@ -7,15 +7,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// API Client: el token JWT vive en AuthTokenStore (singleton) y el AuthTokenHandler
-// lo adjunta a cada petición, con lo que todas las instancias de ApiClient comparten la sesión.
-builder.Services.AddSingleton<AuthTokenStore>();
-builder.Services.AddTransient<AuthTokenHandler>();
-builder.Services.AddHttpClient<ApiClient>(client =>
+// API Client: AuthTokenStore y el HttpClient de ApiClient son scoped (uno por
+// circuito/usuario conectado). IHttpClientFactory no sirve aquí porque los handlers
+// añadidos con AddHttpMessageHandler se resuelven en un scope propio del factory,
+// desconectado del circuito de Blazor Server, así que el HttpClient se construye
+// a mano dentro del scope correcto para que cada usuario use su propio token.
+builder.Services.AddScoped<AuthTokenStore>();
+builder.Services.AddScoped(sp =>
 {
-    client.BaseAddress = new Uri("http://localhost:5253/");
-})
-    .AddHttpMessageHandler<AuthTokenHandler>();
+    var tokenStore = sp.GetRequiredService<AuthTokenStore>();
+    var handler = new AuthTokenHandler(tokenStore) { InnerHandler = new HttpClientHandler() };
+    return new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5253/") };
+});
+builder.Services.AddScoped<ApiClient>();
 
 builder.Services.AddScoped<AuthState>();
 builder.Services.AddScoped<ThemeState>();
