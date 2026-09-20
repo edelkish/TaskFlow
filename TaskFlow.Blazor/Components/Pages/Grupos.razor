@@ -30,64 +30,62 @@
             </div>
 
             <div class="card-body">
-                @if (Error != null)
-                {
-                    <div class="alert alert-danger">@Error</div>
-                }
-
                 @if (ShowCreate)
                 {
                     <div class="card card-outline card-primary mb-3">
                         <div class="card-body">
                             <h6 class="card-title mb-3"><i class="bi bi-plus-circle me-1"></i>Crear grupo de tareas</h6>
-                            <div class="row g-2">
-                                <div class="col-md-3">
-                                    <label class="form-label">Periodo</label>
-                                    <select class="form-select" @bind="NewPeriodId">
-                                        <option value="">Seleccione periodo...</option>
-                                        @foreach (var p in Periods ?? new())
-                                        {
-                                            <option value="@p.Id">@($"{p.Name} — {p.Year} {new System.Globalization.CultureInfo("es-ES").DateTimeFormat.GetMonthName(p.Month)}")</option>
-                                        }
-                                    </select>
+                            <form class="needs-validation" novalidate @ref="_createForm">
+                                <div class="row g-2">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Periodo</label>
+                                        <select class="form-select" required @bind="NewPeriodId">
+                                            <option value="">Seleccione periodo...</option>
+                                            @foreach (var p in Periods ?? new())
+                                            {
+                                                <option value="@p.Id">@($"{p.Name} — {p.Year} {new System.Globalization.CultureInfo("es-ES").DateTimeFormat.GetMonthName(p.Month)}")</option>
+                                            }
+                                        </select>
+                                        <div class="invalid-feedback">Seleccione el periodo.</div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Dev</label>
+                                        <select class="form-select" @bind="NewDevId">
+                                            <option value="">—</option>
+                                            @foreach (var per in People ?? new())
+                                            {
+                                                <option value="@per.Id">@per.Name</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Team Lead</label>
+                                        <select class="form-select" @bind="NewTeamLeadId">
+                                            <option value="">—</option>
+                                            @foreach (var per in People ?? new())
+                                            {
+                                                <option value="@per.Id">@per.Name</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">QA</label>
+                                        <select class="form-select" @bind="NewQaId">
+                                            <option value="">—</option>
+                                            @foreach (var per in People ?? new())
+                                            {
+                                                <option value="@per.Id">@per.Name</option>
+                                            }
+                                        </select>
+                                    </div>
                                 </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Dev</label>
-                                    <select class="form-select" @bind="NewDevId">
-                                        <option value="">—</option>
-                                        @foreach (var per in People ?? new())
-                                        {
-                                            <option value="@per.Id">@per.Name</option>
-                                        }
-                                    </select>
+                                <div class="mt-3">
+                                    <button type="button" class="btn btn-primary btn-sm" disabled="@Busy" @onclick="CreateGroupAsync">
+                                        <i class="bi bi-check-lg me-1"></i> Guardar
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm" @onclick="() => ShowCreate = false">Cancelar</button>
                                 </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Team Lead</label>
-                                    <select class="form-select" @bind="NewTeamLeadId">
-                                        <option value="">—</option>
-                                        @foreach (var per in People ?? new())
-                                        {
-                                            <option value="@per.Id">@per.Name</option>
-                                        }
-                                    </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">QA</label>
-                                    <select class="form-select" @bind="NewQaId">
-                                        <option value="">—</option>
-                                        @foreach (var per in People ?? new())
-                                        {
-                                            <option value="@per.Id">@per.Name</option>
-                                        }
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="mt-3">
-                                <button class="btn btn-primary btn-sm" disabled="@Busy" @onclick="CreateGroupAsync">
-                                    <i class="bi bi-check-lg me-1"></i> Guardar
-                                </button>
-                                <button class="btn btn-secondary btn-sm" @onclick="() => ShowCreate = false">Cancelar</button>
-                            </div>
+                            </form>
                         </div>
                     </div>
                 }
@@ -144,6 +142,8 @@
 </div>
 
 @code {
+    private ElementReference _createForm;
+
     private List<TaskFlow.Application.DTOs.PeriodDto>? Periods { get; set; }
     private List<TaskFlow.Application.DTOs.PersonDto>? People { get; set; }
     private List<TaskFlow.Application.DTOs.TaskGroupDto>? Groups { get; set; }
@@ -155,7 +155,6 @@
     private string? NewTeamLeadId { get; set; }
     private string? NewQaId { get; set; }
     private bool Busy { get; set; }
-    private string? Error { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -187,7 +186,7 @@
 
     private async Task LoadAsync()
     {
-        Error = null;
+        LoadError = null;
         try
         {
             if (Guid.TryParse(SelectedPeriodId, out var periodId))
@@ -204,22 +203,21 @@
         catch (Exception ex)
         {
             Groups = new();
-            Error = ex.Message;
+            LoadError = ex.Message;
         }
     }
 
     private async Task CreateGroupAsync()
     {
-        if (!Guid.TryParse(NewPeriodId, out var periodId))
+        if (!await Toast.ValidateFormAsync(_createForm))
         {
-            Error = "Seleccione el periodo.";
             return;
         }
 
         Busy = true;
-        Error = null;
         try
         {
+            var periodId = Guid.Parse(NewPeriodId);
             await Api.CreateGroupAsync(new TaskFlow.Application.DTOs.CreateTaskGroupDto
             {
                 PeriodId = periodId,
@@ -230,11 +228,12 @@
             ShowCreate = false;
             NewPeriodId = string.Empty;
             NewDevId = NewTeamLeadId = NewQaId = null;
+            await Toast.SuccessAsync("Grupo creado correctamente.");
             await LoadAsync();
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            await Toast.ErrorAsync(ex.Message);
         }
         finally
         {

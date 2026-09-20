@@ -15,11 +15,6 @@
                 }
             </div>
             <div class="card-body">
-                @if (Error != null)
-                {
-                    <div class="alert alert-danger">@Error</div>
-                }
-
                 @if (Group != null)
                 {
                     <div class="row mb-3">
@@ -38,31 +33,35 @@
                         <div class="card card-outline card-primary mb-3">
                             <div class="card-body">
                                 <h6 class="card-title mb-3">Nueva tarea</h6>
-                                <div class="row g-2">
-                                    <div class="col-md-1"><label class="form-label">Nº</label>
-                                        <input type="number" class="form-control" @bind="NewNumber" />
+                                <form class="needs-validation" novalidate @ref="_createForm">
+                                    <div class="row g-2">
+                                        <div class="col-md-1"><label class="form-label">Nº</label>
+                                            <input type="number" class="form-control" min="1" required @bind="NewNumber" />
+                                            <div class="invalid-feedback">Obligatorio.</div>
+                                        </div>
+                                        <div class="col-md-1"><label class="form-label">Sub</label>
+                                            <input type="number" class="form-control" placeholder="—" min="0" @bind="NewSubNumber" />
+                                        </div>
+                                        <div class="col-md-5"><label class="form-label">Descripción</label>
+                                            <input type="text" class="form-control" maxlength="500" required @bind="NewDescription" />
+                                            <div class="invalid-feedback">La descripción es obligatoria.</div>
+                                        </div>
+                                        <div class="col-md-3"><label class="form-label">Asignar a</label>
+                                            <select class="form-select" @bind="NewAssignedId">
+                                                <option value="">Sin asignar</option>
+                                                @foreach (var m in GroupMembers)
+                                                {
+                                                    <option value="@m.Key">@m.Value</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 d-flex align-items-end">
+                                            <button type="button" class="btn btn-primary btn-sm" disabled="@Busy" @onclick="CreateTaskAsync">
+                                                <i class="bi bi-check-lg me-1"></i> Guardar
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div class="col-md-1"><label class="form-label">Sub</label>
-                                        <input type="number" class="form-control" placeholder="—" @bind="NewSubNumber" />
-                                    </div>
-                                    <div class="col-md-5"><label class="form-label">Descripción</label>
-                                        <input type="text" class="form-control" @bind="NewDescription" />
-                                    </div>
-                                    <div class="col-md-3"><label class="form-label">Asignar a</label>
-                                        <select class="form-select" @bind="NewAssignedId">
-                                            <option value="">Sin asignar</option>
-                                            @foreach (var m in GroupMembers)
-                                            {
-                                                <option value="@m.Key">@m.Value</option>
-                                            }
-                                        </select>
-                                    </div>
-                                    <div class="col-md-2 d-flex align-items-end">
-                                        <button class="btn btn-primary btn-sm" disabled="@Busy" @onclick="CreateTaskAsync">
-                                            <i class="bi bi-check-lg me-1"></i> Guardar
-                                        </button>
-                                    </div>
-                                </div>
+                                </form>
                             </div>
                         </div>
                     }
@@ -131,34 +130,38 @@
                                         {
                                             <tr>
                                                 <td colspan="5">
-                                                    <div class="row g-2">
-                                                        <div class="col-md-1">
-                                                            <input type="number" class="form-control form-control-sm" @bind="EditNumber" />
+                                                    <form class="needs-validation" novalidate @ref="_editForm">
+                                                        <div class="row g-2">
+                                                            <div class="col-md-1">
+                                                                <input type="number" class="form-control form-control-sm" min="1" required @bind="EditNumber" />
+                                                                <div class="invalid-feedback">Obligatorio.</div>
+                                                            </div>
+                                                            <div class="col-md-1">
+                                                                <input type="number" class="form-control form-control-sm" placeholder="Sub" min="0" @bind="EditSubNumber" />
+                                                            </div>
+                                                            <div class="col-md-5">
+                                                                <input type="text" class="form-control form-control-sm" maxlength="500" required @bind="EditDescription" />
+                                                                <div class="invalid-feedback">La descripción es obligatoria.</div>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <select class="form-select form-select-sm" @bind="EditAssignedId">
+                                                                    <option value="">Sin asignar</option>
+                                                                    @foreach (var m in GroupMembers)
+                                                                    {
+                                                                        <option value="@m.Key">@m.Value</option>
+                                                                    }
+                                                                </select>
+                                                            </div>
+                                                            <div class="col-md-2">
+                                                                <button type="button" class="btn btn-sm btn-success" @onclick="() => SaveEditAsync(t)">
+                                                                    <i class="bi bi-check-lg"></i>
+                                                                </button>
+                                                                <button type="button" class="btn btn-sm btn-secondary ms-1" @onclick="CancelEdit">
+                                                                    <i class="bi bi-x-lg"></i>
+                                                                </button>
+                                                            </div>
                                                         </div>
-                                                        <div class="col-md-1">
-                                                            <input type="number" class="form-control form-control-sm" placeholder="Sub" @bind="EditSubNumber" />
-                                                        </div>
-                                                        <div class="col-md-5">
-                                                            <input type="text" class="form-control form-control-sm" @bind="EditDescription" />
-                                                        </div>
-                                                        <div class="col-md-3">
-                                                            <select class="form-select form-select-sm" @bind="EditAssignedId">
-                                                                <option value="">Sin asignar</option>
-                                                                @foreach (var m in GroupMembers)
-                                                                {
-                                                                    <option value="@m.Key">@m.Value</option>
-                                                                }
-                                                            </select>
-                                                        </div>
-                                                        <div class="col-md-2">
-                                                            <button class="btn btn-sm btn-success" @onclick="() => SaveEditAsync(t)">
-                                                                <i class="bi bi-check-lg"></i>
-                                                            </button>
-                                                            <button class="btn btn-sm btn-secondary ms-1" @onclick="CancelEdit">
-                                                                <i class="bi bi-x-lg"></i>
-                                                            </button>
-                                                        </div>
-                                                    </div>
+                                                    </form>
                                                 </td>
                                             </tr>
                                         }
@@ -180,13 +183,14 @@
 </div>
 
 @code {
+    private ElementReference _createForm;
+    private ElementReference _editForm;
+
     private Guid GroupId { get; set; } = Guid.Empty;
     private TaskFlow.Application.DTOs.TaskGroupDto? Group { get; set; }
-    private List<TaskFlow.Application.DTOs.PersonDto>? People { get; set; }
     private Dictionary<string, string> GroupMembers { get; set; } = new();
     private bool ShowCreate { get; set; }
     private bool Busy { get; set; }
-    private string? Error { get; set; }
 
     private int NewNumber { get; set; } = 1;
     private int? NewSubNumber { get; set; }
@@ -213,10 +217,9 @@
 
     private async Task LoadAsync()
     {
-        Error = null;
+        LoadError = null;
         try
         {
-            People = await Api.GetPeopleAsync();
             if (GroupId != Guid.Empty)
             {
                 Group = await Api.GetGroupAsync(GroupId);
@@ -225,7 +228,7 @@
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            LoadError = ex.Message;
         }
     }
 
@@ -247,14 +250,12 @@
 
     private async Task CreateTaskAsync()
     {
-        if (string.IsNullOrWhiteSpace(NewDescription))
+        if (!await Toast.ValidateFormAsync(_createForm))
         {
-            Error = "La descripción es obligatoria.";
             return;
         }
 
         Busy = true;
-        Error = null;
         try
         {
             await Api.CreateTaskAsync(new TaskFlow.Application.DTOs.CreatePlanningTaskDto
@@ -268,11 +269,12 @@
             ShowCreate = false;
             NewDescription = string.Empty;
             NewNumber++;
+            await Toast.SuccessAsync("Tarea creada correctamente.");
             await LoadAsync();
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            await Toast.ErrorAsync(ex.Message);
         }
         finally
         {
@@ -282,15 +284,15 @@
 
     private async Task ReassignAsync(TaskFlow.Application.DTOs.PlanningTaskDto task, string? personId)
     {
-        Error = null;
         try
         {
             await Api.ReassignTaskAsync(task.Id, ParseId(personId));
+            await Toast.SuccessAsync("Tarea reasignada.");
             await LoadAsync();
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            await Toast.ErrorAsync(ex.Message);
         }
     }
 
@@ -315,14 +317,12 @@
 
     private async Task SaveEditAsync(TaskFlow.Application.DTOs.PlanningTaskDto task)
     {
-        if (string.IsNullOrWhiteSpace(EditDescription))
+        if (!await Toast.ValidateFormAsync(_editForm))
         {
-            Error = "La descripción es obligatoria.";
             return;
         }
 
         Busy = true;
-        Error = null;
         try
         {
             await Api.UpdateTaskAsync(task.Id, new TaskFlow.Application.DTOs.UpdatePlanningTaskDto
@@ -333,11 +333,12 @@
                 Description = EditDescription.Trim()
             });
             CancelEdit();
+            await Toast.SuccessAsync("Tarea actualizada correctamente.");
             await LoadAsync();
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            await Toast.ErrorAsync(ex.Message);
         }
         finally
         {
@@ -347,15 +348,15 @@
 
     private async Task DeleteAsync(TaskFlow.Application.DTOs.PlanningTaskDto task)
     {
-        Error = null;
         try
         {
             await Api.DeleteTaskFromGroupAsync(task.Id);
+            await Toast.SuccessAsync("Tarea eliminada.");
             await LoadAsync();
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            await Toast.ErrorAsync(ex.Message);
         }
     }
 

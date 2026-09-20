@@ -18,12 +18,14 @@
 </head>
 
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
-    <Routes />
+    <Routes @rendermode="InteractiveServer" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="@Assets["lib/bootstrap/dist/js/bootstrap.bundle.min.js"]"></script>
     <script src="@Assets["lib/adminlte/js/adminlte.js"]"></script>
     <script src="@Assets["js/theme.js"]"></script>
+    <script src="@Assets["js/validation.js"]"></script>
+    <script src="@Assets["js/notify.js"]"></script>
     <script>
         // Re-inicializa los componentes de AdminLTE (sidebar, etc.) cuando Blazor comienza,
         // para recuperar sus controladores de eventos sobre el DOM actual.

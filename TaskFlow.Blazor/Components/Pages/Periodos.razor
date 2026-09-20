@@ -12,35 +12,33 @@
             </div>
 
             <div class="card-body">
-                <div class="row g-2 align-items-end mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Año</label>
-                        <input type="number" class="form-control" @bind="NewYear" min="2020" max="2100" />
+                <form class="needs-validation" novalidate @ref="_createForm" @onsubmit="CreateAsync" @onsubmit:preventDefault>
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Año</label>
+                            <input type="number" class="form-control" @bind="NewYear" min="2020" max="2100" required />
+                            <div class="invalid-feedback">Indique el año (2020–2100).</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Mes</label>
+                            <select class="form-select" @bind="NewMonth">
+                                @for (var i = 1; i <= 12; i++)
+                                {
+                                    <option value="@i">@(new System.Globalization.CultureInfo("es-ES").DateTimeFormat.GetMonthName(i))</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Nombre</label>
+                            <input type="text" class="form-control" placeholder="Opcional" maxlength="100" @bind="NewName" />
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100" disabled="@Busy">
+                                <i class="bi bi-plus-lg me-1"></i> Crear
+                            </button>
+                        </div>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Mes</label>
-                        <select class="form-select" @bind="NewMonth">
-                            @for (var i = 1; i <= 12; i++)
-                            {
-                                <option value="@i">@(new System.Globalization.CultureInfo("es-ES").DateTimeFormat.GetMonthName(i))</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Nombre</label>
-                        <input type="text" class="form-control" placeholder="Opcional" @bind="NewName" />
-                    </div>
-                    <div class="col-md-2">
-                        <button class="btn btn-primary w-100" disabled="@Busy" @onclick="CreateAsync">
-                            <i class="bi bi-plus-lg me-1"></i> Crear
-                        </button>
-                    </div>
-                </div>
-
-                @if (Error != null)
-                {
-                    <div class="alert alert-danger">@Error</div>
-                }
+                </form>
 
                 <div class="table-responsive">
                     <table class="table table-hover table-striped">
@@ -82,11 +80,12 @@
 </div>
 
 @code {
+    private ElementReference _createForm;
+
     private int NewYear { get; set; } = DateTime.Today.Year;
     private int NewMonth { get; set; } = DateTime.Today.Month;
     private string NewName { get; set; } = string.Empty;
     private bool Busy { get; set; }
-    private string? Error { get; set; }
     private List<TaskFlow.Application.DTOs.PeriodDto>? Periods { get; set; }
 
     protected override async Task OnInitializedAsync()
@@ -96,20 +95,26 @@
 
     private async Task LoadAsync()
     {
+        LoadError = null;
         try
         {
             Periods = await Api.GetPeriodsAsync();
         }
-        catch
+        catch (Exception ex)
         {
             Periods = new();
+            LoadError = ex.Message;
         }
     }
 
     private async Task CreateAsync()
     {
+        if (!await Toast.ValidateFormAsync(_createForm))
+        {
+            return;
+        }
+
         Busy = true;
-        Error = null;
         try
         {
             var name = !string.IsNullOrWhiteSpace(NewName)
@@ -123,11 +128,12 @@
                 Name = name
             });
             NewName = string.Empty;
+            await Toast.SuccessAsync("Periodo creado correctamente.");
             await LoadAsync();
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            await Toast.ErrorAsync(ex.Message);
         }
         finally
         {

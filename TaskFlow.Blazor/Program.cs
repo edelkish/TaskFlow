@@ -13,12 +13,13 @@ builder.Services.AddSingleton<AuthTokenStore>();
 builder.Services.AddTransient<AuthTokenHandler>();
 builder.Services.AddHttpClient<ApiClient>(client =>
 {
-    client.BaseAddress = new Uri("https://localhost:7185/");
+    client.BaseAddress = new Uri("http://localhost:5253/");
 })
     .AddHttpMessageHandler<AuthTokenHandler>();
 
 builder.Services.AddScoped<AuthState>();
 builder.Services.AddScoped<ThemeState>();
+builder.Services.AddScoped<ToastService>();
 
 var app = builder.Build();
 

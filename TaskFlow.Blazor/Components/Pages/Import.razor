@@ -11,23 +11,21 @@
                 <h3 class="card-title"><i class="bi bi-box-arrow-down me-2"></i>Importar planificación de tareas</h3>
             </div>
             <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-8">
-                        <label class="form-label">Ruta del archivo TXT</label>
-                        <input type="text" class="form-control" placeholder="D:\PT 2026\taskAgosto2026.txt" @bind="FilePath" />
+                <form class="needs-validation" novalidate @ref="_importForm" @onsubmit="ImportAsync" @onsubmit:preventDefault>
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Ruta del archivo TXT</label>
+                            <input type="text" class="form-control" placeholder="D:\PT 2026\taskAgosto2026.txt" required @bind="FilePath" />
+                            <div class="invalid-feedback">Indique la ruta del archivo TXT.</div>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary" disabled="@Busy">
+                                <i class="bi bi-box-arrow-down me-1"></i>
+                                @(Busy ? "Importando..." : "Importar")
+                            </button>
+                        </div>
                     </div>
-                    <div class="col-md-4 d-flex align-items-end">
-                        <button class="btn btn-primary" disabled="@Busy" @onclick="ImportAsync">
-                            <i class="bi bi-box-arrow-down me-1"></i>
-                            @(Busy ? "Importando..." : "Importar")
-                        </button>
-                    </div>
-                </div>
-
-                @if (Error != null)
-                {
-                    <div class="alert alert-danger mt-3">@Error</div>
-                }
+                </form>
 
                 @if (Result != null)
                 {
@@ -64,7 +62,7 @@
                             </ul>
                         </div>
                     }
-<button class="btn btn-outline-primary mt-2" @onclick="GoToGrupos">
+                    <button class="btn btn-outline-primary mt-2" @onclick="GoToGrupos">
                         <i class="bi bi-diagram-3 me-1"></i> Ver grupos del periodo
                     </button>
                 }
@@ -122,9 +120,10 @@
 </div>
 
 @code {
+    private ElementReference _importForm;
+
     private string FilePath { get; set; } = string.Empty;
     private bool Busy { get; set; }
-    private string? Error { get; set; }
     private TaskFlow.Application.DTOs.ImportResultDto? Result { get; set; }
     private List<TaskFlow.Application.DTOs.ImportBatchDto>? Batches { get; set; }
 
@@ -135,36 +134,37 @@
 
     private async Task LoadBatchesAsync()
     {
+        LoadError = null;
         try
         {
             Batches = await Api.GetImportBatchesAsync();
         }
-        catch
+        catch (Exception ex)
         {
             Batches = new();
+            LoadError = ex.Message;
         }
     }
 
     private async Task ImportAsync()
     {
-        if (string.IsNullOrWhiteSpace(FilePath))
+        if (!await Toast.ValidateFormAsync(_importForm))
         {
-            Error = "Indique la ruta del archivo TXT.";
             return;
         }
 
         Busy = true;
-        Error = null;
         try
         {
             Result = await Api.ImportFileAsync(FilePath.Trim());
             FilePath = string.Empty;
+            await Toast.SuccessAsync($"Importación completada: {Result?.TasksImported ?? 0} tareas en {Result?.GroupsCreated ?? 0} grupos nuevos.");
             await LoadBatchesAsync();
         }
         catch (Exception ex)
         {
             Result = null;
-            Error = ex.Message;
+            await Toast.ErrorAsync(ex.Message);
         }
         finally
         {

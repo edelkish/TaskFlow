@@ -14,32 +14,30 @@
                 </button>
             </div>
             <div class="card-body">
-                @if (Error != null)
-                {
-                    <div class="alert alert-danger">@Error</div>
-                }
-
                 @if (ShowCreate)
                 {
                     <div class="card card-outline card-primary mb-3">
                         <div class="card-body">
                             <h6 class="card-title mb-3">Nueva persona</h6>
-                            <div class="row g-2">
-                                <div class="col-md-5">
-                                    <label class="form-label">Nombre</label>
-                                    <input type="text" class="form-control" @bind="NewName" />
+                            <form class="needs-validation" novalidate @ref="_createForm">
+                                <div class="row g-2">
+                                    <div class="col-md-5">
+                                        <label class="form-label">Nombre</label>
+                                        <input type="text" class="form-control" maxlength="200" required @bind="NewName" />
+                                        <div class="invalid-feedback">El nombre es obligatorio.</div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Usuario (Id)</label>
+                                        <input type="text" class="form-control" placeholder="Opcional" @bind="NewUserId" />
+                                    </div>
+                                    <div class="col-md-4 d-flex align-items-end">
+                                        <button type="button" class="btn btn-primary btn-sm" disabled="@Busy" @onclick="CreateAsync">
+                                            <i class="bi bi-check-lg me-1"></i> Guardar
+                                        </button>
+                                        <button type="button" class="btn btn-secondary btn-sm ms-1" @onclick="() => ShowCreate = false">Cancelar</button>
+                                    </div>
                                 </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Usuario (Id)</label>
-                                    <input type="text" class="form-control" placeholder="Opcional" @bind="NewUserId" />
-                                </div>
-                                <div class="col-md-4 d-flex align-items-end">
-                                    <button class="btn btn-primary btn-sm" disabled="@Busy" @onclick="CreateAsync">
-                                        <i class="bi bi-check-lg me-1"></i> Guardar
-                                    </button>
-                                    <button class="btn btn-secondary btn-sm ms-1" @onclick="() => ShowCreate = false">Cancelar</button>
-                                </div>
-                            </div>
+                            </form>
                         </div>
                     </div>
                 }
@@ -87,22 +85,25 @@
                                     {
                                         <tr>
                                             <td colspan="3">
-                                                <div class="row g-2">
-                                                    <div class="col-md-5">
-                                                        <input type="text" class="form-control form-control-sm" @bind="EditName" />
+                                                <form class="needs-validation" novalidate @ref="_editForm">
+                                                    <div class="row g-2">
+                                                        <div class="col-md-5">
+                                                            <input type="text" class="form-control form-control-sm" maxlength="200" required @bind="EditName" />
+                                                            <div class="invalid-feedback">El nombre es obligatorio.</div>
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <input type="text" class="form-control form-control-sm" placeholder="Usuario (Id)" @bind="EditUserId" />
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <button type="button" class="btn btn-sm btn-success" @onclick="() => SaveEditAsync(per)">
+                                                                <i class="bi bi-check-lg"></i>
+                                                            </button>
+                                                            <button type="button" class="btn btn-sm btn-secondary ms-1" @onclick="CancelEdit">
+                                                                <i class="bi bi-x-lg"></i>
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <div class="col-md-3">
-                                                        <input type="text" class="form-control form-control-sm" placeholder="Usuario (Id)" @bind="EditUserId" />
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <button class="btn btn-sm btn-success" @onclick="() => SaveEditAsync(per)">
-                                                            <i class="bi bi-check-lg"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-secondary ms-1" @onclick="CancelEdit">
-                                                            <i class="bi bi-x-lg"></i>
-                                                        </button>
-                                                    </div>
-                                                </div>
+                                                </form>
                                             </td>
                                         </tr>
                                     }
@@ -117,10 +118,12 @@
 </div>
 
 @code {
+    private ElementReference _createForm;
+    private ElementReference _editForm;
+
     private List<TaskFlow.Application.DTOs.PersonDto>? People { get; set; }
     private bool ShowCreate { get; set; }
     private bool Busy { get; set; }
-    private string? Error { get; set; }
 
     private string NewName { get; set; } = string.Empty;
     private string NewUserId { get; set; } = string.Empty;
@@ -136,7 +139,7 @@
 
     private async Task LoadAsync()
     {
-        Error = null;
+        LoadError = null;
         try
         {
             People = await Api.GetPeopleAsync();
@@ -144,20 +147,18 @@
         catch (Exception ex)
         {
             People = new();
-            Error = ex.Message;
+            LoadError = ex.Message;
         }
     }
 
     private async Task CreateAsync()
     {
-        if (string.IsNullOrWhiteSpace(NewName))
+        if (!await Toast.ValidateFormAsync(_createForm))
         {
-            Error = "El nombre es obligatorio.";
             return;
         }
 
         Busy = true;
-        Error = null;
         try
         {
             await Api.CreatePersonAsync(new TaskFlow.Application.DTOs.CreatePersonDto
@@ -168,11 +169,12 @@
             ShowCreate = false;
             NewName = string.Empty;
             NewUserId = string.Empty;
+            await Toast.SuccessAsync("Persona creada correctamente.");
             await LoadAsync();
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            await Toast.ErrorAsync(ex.Message);
         }
         finally
         {
@@ -199,14 +201,12 @@
 
     private async Task SaveEditAsync(TaskFlow.Application.DTOs.PersonDto person)
     {
-        if (string.IsNullOrWhiteSpace(EditName))
+        if (!await Toast.ValidateFormAsync(_editForm))
         {
-            Error = "El nombre es obligatorio.";
             return;
         }
 
         Busy = true;
-        Error = null;
         try
         {
             await Api.UpdatePersonAsync(person.Id, new TaskFlow.Application.DTOs.UpdatePersonDto
@@ -215,11 +215,12 @@
                 UserId = string.IsNullOrWhiteSpace(EditUserId) ? null : EditUserId.Trim()
             });
             CancelEdit();
+            await Toast.SuccessAsync("Persona actualizada correctamente.");
             await LoadAsync();
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            await Toast.ErrorAsync(ex.Message);
         }
         finally
         {
@@ -229,15 +230,15 @@
 
     private async Task DeleteAsync(TaskFlow.Application.DTOs.PersonDto person)
     {
-        Error = null;
         try
         {
             await Api.DeletePersonAsync(person.Id);
+            await Toast.SuccessAsync("Persona eliminada.");
             await LoadAsync();
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            await Toast.ErrorAsync(ex.Message);
         }
     }
 }

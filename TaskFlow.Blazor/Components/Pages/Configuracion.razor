@@ -13,67 +13,65 @@
             </div>
 
             <div class="card-body">
-                @if (Error != null)
-                {
-                    <div class="alert alert-danger">@Error</div>
-                }
-
                 @if (!Busy)
                 {
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Modo de color</label>
-                            <select class="form-select" @bind="ColorMode">
-                                <option value="light">Claro</option>
-                                <option value="dark">Oscuro</option>
-                            </select>
-                            <div class="form-text">Define el tema de todo el sistema (login incluido).</div>
-                        </div>
+                    <form class="needs-validation" novalidate @ref="_form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Modo de color</label>
+                                <select class="form-select" @bind="ColorMode">
+                                    <option value="light">Claro</option>
+                                    <option value="dark">Oscuro</option>
+                                </select>
+                                <div class="form-text">Define el tema de todo el sistema (login incluido).</div>
+                            </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Color primario</label>
-                            <div class="d-flex align-items-center gap-2">
-                                <input type="color" class="form-control form-control-color" style="width: 3rem; height: 2.4rem;" @bind="Primary" />
-                                <input type="text" class="form-control" @bind="Primary" maxlength="7" />
+                            <div class="col-md-6">
+                                <label class="form-label">Color primario</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="color" class="form-control form-control-color" style="width: 3rem; height: 2.4rem;" @bind="Primary" />
+                                    <input type="text" class="form-control" @bind="Primary" maxlength="7" required pattern="#[0-9a-fA-F]{6}" />
+                                    <div class="invalid-feedback">Formato #RRGGBB (ej. #467FD0).</div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Barra lateral</label>
+                                <select class="form-select" @bind="SidebarBg">
+                                    @foreach (var bg in BackgroundOptions)
+                                    {
+                                        <option value="@bg.Value">@bg.Label</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Encabezado</label>
+                                <select class="form-select" @bind="HeaderBg">
+                                    @foreach (var bg in BackgroundOptions)
+                                    {
+                                        <option value="@bg.Value">@bg.Label</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Pie de página</label>
+                                <select class="form-select" @bind="FooterBg">
+                                    @foreach (var bg in BackgroundOptions)
+                                    {
+                                        <option value="@bg.Value">@bg.Label</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="col-12 mt-4">
+                                <button type="submit" class="btn btn-primary" disabled="@Busy">
+                                    <i class="bi bi-check-lg me-1"></i> Guardar configuración
+                                </button>
                             </div>
                         </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Barra lateral</label>
-                            <select class="form-select" @bind="SidebarBg">
-                                @foreach (var bg in BackgroundOptions)
-                                {
-                                    <option value="@bg.Value">@bg.Label</option>
-                                }
-                            </select>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Encabezado</label>
-                            <select class="form-select" @bind="HeaderBg">
-                                @foreach (var bg in BackgroundOptions)
-                                {
-                                    <option value="@bg.Value">@bg.Label</option>
-                                }
-                            </select>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Pie de página</label>
-                            <select class="form-select" @bind="FooterBg">
-                                @foreach (var bg in BackgroundOptions)
-                                {
-                                    <option value="@bg.Value">@bg.Label</option>
-                                }
-                            </select>
-                        </div>
-
-                        <div class="col-12 mt-4">
-                            <button class="btn btn-primary" disabled="@Busy" @onclick="SaveAsync">
-                                <i class="bi bi-check-lg me-1"></i> Guardar configuración
-                            </button>
-                        </div>
-                    </div>
+                    </form>
                 }
                 else
                 {
@@ -104,8 +102,9 @@
         new("bg-info", "Cian")
     };
 
+    private ElementReference _form;
+
     private bool Busy { get; set; } = true;
-    private string? Error { get; set; }
     private string ColorMode { get; set; } = "light";
     private string SidebarBg { get; set; } = "bg-body-secondary";
     private string HeaderBg { get; set; } = "bg-body";
@@ -135,7 +134,7 @@
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            LoadError = ex.Message;
         }
         finally
         {
@@ -145,8 +144,12 @@
 
     private async Task SaveAsync()
     {
+        if (!await Toast.ValidateFormAsync(_form))
+        {
+            return;
+        }
+
         Busy = true;
-        Error = null;
         try
         {
             var hex = Primary.Trim();
@@ -167,10 +170,11 @@
                 FooterBg = FooterBg,
                 Primary = hex
             });
+            await Toast.SuccessAsync("Configuración guardada correctamente.");
         }
         catch (Exception ex)
         {
-            Error = ex.Message;
+            await Toast.ErrorAsync(ex.Message);
         }
         finally
         {
