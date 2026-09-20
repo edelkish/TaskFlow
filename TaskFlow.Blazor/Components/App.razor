@@ -1,47 +1,6 @@
-﻿<!DOCTYPE html>
 @inject TaskFlow.Blazor.Services.ThemeState Theme
-<html lang="es" data-bs-theme="light">
 
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <base href="/" />
-    <ResourcePreloader />
-    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
-    <link rel="stylesheet" href="@Assets["lib/bootstrap-icons/bootstrap-icons.min.css"]" />
-    <link rel="stylesheet" href="@Assets["lib/adminlte/css/adminlte.css"]" />
-    <link rel="stylesheet" href="@Assets["lib/flatpickr/flatpickr.min.css"]" />
-    <link rel="stylesheet" href="@Assets["app.css"]" />
-    <link rel="stylesheet" href="@Assets["TaskFlow.Blazor.styles.css"]" />
-    <ImportMap />
-    <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet />
-</head>
-
-<body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
-    <Routes @rendermode="InteractiveServer" />
-    <ReconnectModal />
-    <script src="@Assets["_framework/blazor.web.js"]"></script>
-    <script src="@Assets["lib/bootstrap/dist/js/bootstrap.bundle.min.js"]"></script>
-    <script src="@Assets["lib/adminlte/js/adminlte.js"]"></script>
-    <script src="@Assets["lib/flatpickr/flatpickr.min.js"]"></script>
-    <script src="@Assets["lib/flatpickr/l10n/es.js"]"></script>
-    <script src="@Assets["js/theme.js"]"></script>
-    <script src="@Assets["js/validation.js"]"></script>
-    <script src="@Assets["js/notify.js"]"></script>
-    <script src="@Assets["js/datepicker.js"]"></script>
-    <script>
-        // Re-inicializa los componentes de AdminLTE (sidebar, etc.) cuando Blazor comienza,
-        // para recuperar sus controladores de eventos sobre el DOM actual.
-        window.addEventListener('blazor:boot', function () {
-            if (window.adminlte && typeof window.adminlte.initialize === 'function') {
-                window.adminlte.initialize();
-            }
-        });
-    </script>
-</body>
-
-</html>
+<Routes />
 
 @code {
     protected override async Task OnAfterRenderAsync(bool firstRender)

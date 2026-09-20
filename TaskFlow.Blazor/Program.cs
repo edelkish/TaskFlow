@@ -1,46 +1,33 @@
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using TaskFlow.Blazor.Components;
 using TaskFlow.Blazor.Services;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
-// Add services to the container.
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+builder.RootComponents.Add<App>("#app");
+builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// API Client: AuthTokenStore y el HttpClient de ApiClient son scoped (uno por
-// circuito/usuario conectado). IHttpClientFactory no sirve aquí porque los handlers
-// añadidos con AddHttpMessageHandler se resuelven en un scope propio del factory,
-// desconectado del circuito de Blazor Server, así que el HttpClient se construye
-// a mano dentro del scope correcto para que cada usuario use su propio token.
-builder.Services.AddScoped<AuthTokenStore>();
-builder.Services.AddScoped(sp =>
+// API Client: IHttpClientFactory construye los handlers agregados con
+// AddHttpMessageHandler en un scope interno propio (creado desde el
+// proveedor raíz), desconectado del scope donde se resuelve el resto de
+// la app — esto pasa en CUALQUIER hosting model, no solo en Blazor Server
+// (la causa de fondo es la misma que en docs/Fix-AuthTokenStore-Scope.md).
+// En WASM la solución es distinta a la de Server: como cada pestaña del
+// navegador es de por sí un solo usuario (no hay circuitos concurrentes
+// que aislar), alcanza con que AuthTokenStore sea Singleton — así el
+// handler y el resto de la app siempre resuelven la misma instancia,
+// sin necesidad de construir el HttpClient a mano.
+builder.Services.AddSingleton<AuthTokenStore>();
+builder.Services.AddTransient<AuthTokenHandler>();
+builder.Services.AddHttpClient<ApiClient>(client =>
 {
-    var tokenStore = sp.GetRequiredService<AuthTokenStore>();
-    var handler = new AuthTokenHandler(tokenStore) { InnerHandler = new HttpClientHandler() };
-    return new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5253/") };
-});
-builder.Services.AddScoped<ApiClient>();
+    client.BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5253/");
+})
+    .AddHttpMessageHandler<AuthTokenHandler>();
 
 builder.Services.AddScoped<AuthState>();
 builder.Services.AddScoped<ThemeState>();
 builder.Services.AddScoped<ToastService>();
 
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    app.UseHsts();
-}
-
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
-
-app.UseAntiforgery();
-
-app.MapStaticAssets();
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
-
-app.Run();
+await builder.Build().RunAsync();

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="light">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="preload" id="webassembly" />
+    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="lib/adminlte/css/adminlte.css" />
+    <link rel="stylesheet" href="lib/flatpickr/flatpickr.min.css" />
+    <link rel="stylesheet" href="app.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <script type="importmap"></script>
+</head>
+
+<body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
+    <div id="app">Cargando...</div>
+
+    <div id="blazor-error-ui" data-nosnippet>
+        Ha ocurrido un error no controlado.
+        <a href="." class="reload">Recargar</a>
+        <span class="dismiss">✕</span>
+    </div>
+
+    <script src="lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="lib/adminlte/js/adminlte.js"></script>
+    <script src="lib/flatpickr/flatpickr.min.js"></script>
+    <script src="lib/flatpickr/l10n/es.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/validation.js"></script>
+    <script src="js/notify.js"></script>
+    <script src="js/datepicker.js"></script>
+    <script>
+        // Re-inicializa los componentes de AdminLTE (sidebar, etc.) cuando Blazor comienza,
+        // para recuperar sus controladores de eventos sobre el DOM actual.
+        window.addEventListener('blazor:boot', function () {
+            if (window.adminlte && typeof window.adminlte.initialize === 'function') {
+                window.adminlte.initialize();
+            }
+        });
+    </script>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+</body>
+
+</html>
