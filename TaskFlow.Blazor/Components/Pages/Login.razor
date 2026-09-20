@@ -151,7 +151,7 @@
         {
             if (await AuthState.LoginAsync(Email.Trim(), Password))
             {
-                Nav.NavigateTo("/dashboard", forceLoad: true);
+                Nav.NavigateTo("/dashboard");
             }
             else
             {
@@ -186,7 +186,7 @@
             else if (await AuthState.LoginAsync(Email.Trim(), Password))
             {
                 await Toast.SuccessAsync("Cuenta creada correctamente.");
-                Nav.NavigateTo("/dashboard", forceLoad: true);
+                Nav.NavigateTo("/dashboard");
             }
         }
         catch (Exception ex)
