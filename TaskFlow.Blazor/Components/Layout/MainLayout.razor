@@ -20,24 +20,43 @@
             </ul>
 
             <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    @if (AuthState.IsAuthenticated)
-                    {
-                        <span class="nav-link">
-                            <i class="bi bi-person-circle me-1"></i>
-                            @AuthState.Email
-                        </span>
-                        <a class="nav-link" href="/login" @onclick="LogoutAsync">
-                            <i class="bi bi-box-arrow-right me-1"></i> Salir
+                @if (AuthState.IsAuthenticated)
+                {
+                    <li class="nav-item dropdown user-menu">
+                        <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-circle user-image" style="font-size: 1.6rem" aria-hidden="true"></i>
+                            <span class="d-none d-md-inline">@AuthState.Email</span>
                         </a>
-                    }
-                    else
-                    {
+                        <ul class="dropdown-menu dropdown-menu-lg dropdown-menu-end">
+                            <li class="user-header text-bg-primary">
+                                <i class="bi bi-person-circle" style="font-size: 4rem" aria-hidden="true"></i>
+                                <p>
+                                    @AuthState.Email
+                                    <small>@string.Join(", ", AuthState.Roles)</small>
+                                </p>
+                            </li>
+                            <li class="user-footer">
+                                @if (AuthState.IsAdmin)
+                                {
+                                    <a href="configuracion" class="btn btn-outline-secondary">
+                                        <i class="bi bi-sliders me-1"></i> Configuración
+                                    </a>
+                                }
+                                <a href="/login" class="btn btn-outline-danger float-end" @onclick="LogoutAsync">
+                                    <i class="bi bi-box-arrow-right me-1"></i> Cerrar sesión
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                }
+                else
+                {
+                    <li class="nav-item">
                         <a class="nav-link" href="login">
                             <i class="bi bi-box-arrow-in-right me-1"></i> Iniciar sesión
                         </a>
-                    }
-                </li>
+                    </li>
+                }
             </ul>
         </div>
     </nav>
