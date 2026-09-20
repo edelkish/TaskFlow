@@ -38,6 +38,28 @@ por especificidad siempre gana sobre una regla de clase:
 <ul class="dropdown-menu dropdown-menu-lg dropdown-menu-end" style="width: 320px">
 ```
 
+**Actualización:** ese primer intento no cambiaba nada visualmente. La causa
+real es otra regla, también en AdminLTE, que define `.dropdown-menu-lg`
+directamente (no es la utilidad de tamaño de Bootstrap, que solo define una
+variable CSS):
+
+```css
+.dropdown-menu-lg {
+  min-width: 280px;
+  max-width: 300px;
+  padding: 0;
+}
+```
+
+`max-width` es una propiedad CSS **distinta** de `width`: un `style="width: 320px"`
+inline gana la pulseada por la propiedad `width`, pero no toca `max-width`, así
+que el navegador seguía recortando la caja a 300px. Hubo que anular también
+`max-width` en el inline style:
+
+```html
+<ul class="dropdown-menu dropdown-menu-lg dropdown-menu-end" style="width: 320px; max-width: 320px">
+```
+
 ## Problema 2: toast "401 (Unauthorized)" justo después de iniciar sesión
 
 ### Síntoma
@@ -82,15 +104,40 @@ ya tiene el token que `AuthState.LoginAsync()` acaba de guardar en memoria
 correctamente desde el primer pedido, sin depender de restaurarlo por JS
 interop.
 
-### Riesgo relacionado, todavía pendiente
+### Riesgo relacionado, confirmado luego: pasaba también en un hard refresh
 
-Esto resuelve la carrera específicamente para el momento de login/registro.
-La misma causa de fondo (orden entre `OnInitializedAsync` de cada página y
-`AuthState.LoadAsync()` en `OnAfterRenderAsync`) podría repetirse en otros
-escenarios que sí crean un circuito nuevo sin pasar por login, por ejemplo
-un F5 (recarga manual) sobre una página ya autenticada. No se corrigió aquí
-porque no fue el síntoma reportado; requeriría revisar el orden de carga en
-`AuthenticatedPageBase` y en cada página que hereda de ella.
+Quitar el `forceLoad` resolvía la carrera puntualmente en el momento de
+login/registro, pero el riesgo que había quedado documentado como pendiente
+se confirmó: haciendo un hard refresh (F5) sobre una página ya autenticada
+aparecía el mismo error 401. Un F5 también crea un circuito de Blazor nuevo
+(sin pasar por `Login.razor`), así que la misma carrera entre
+`OnInitializedAsync` de cada página y `AuthState.LoadAsync()` se repetía.
+
+### Solución de fondo (segunda vuelta)
+
+En vez de corregir el orden de carga en cada página (`AuthenticatedPageBase`
+y las 7 páginas que heredan de ella), se centralizó el fix en el punto donde
+realmente importa: justo antes de que salga cualquier pedido HTTP hacia la
+API.
+
+- `AuthTokenStore.cs`: expone un gate `Ready` (`Task`, respaldado por un
+  `TaskCompletionSource`) que se completa una sola vez, cuando la sesión de
+  este circuito ya fue confirmada.
+- `AuthState.cs`: marca ese gate (`_tokenStore.MarkReady()`) al final de
+  `LoadAsync()` (haya o no restaurado un token) y también apenas se aplica un
+  login/registro exitoso — necesario porque `/login` usa `AuthLayout`, no
+  `MainLayout`, así que `LoadAsync()` nunca corre antes de loguearse.
+- `AuthTokenHandler.cs`: antes de adjuntar el header y mandar el pedido,
+  espera `_tokenStore.Ready` (con un timeout de 5s para no colgarse si algo
+  falla) en su `SendAsync`.
+
+Como `AuthTokenStore` es `scoped` (una instancia por circuito) y
+`AuthTokenHandler` es el único punto por el que pasa toda llamada de
+`ApiClient`, esto garantiza que ningún pedido salga hacia la API hasta saber
+si hay sesión o no, sin importar en qué orden Blazor dispare los
+`OnInitializedAsync` del layout y de la página. Se mantiene la eliminación
+del `forceLoad` en `Login.razor` (navegación más simple, sin recarga
+completa), pero el fix que realmente cierra el problema es este gate.
 
 ## Archivos afectados
 
@@ -99,3 +146,6 @@ porque no fue el síntoma reportado; requeriría revisar el orden de carga en
 | `docs/Fix-Dropdown-Ancho-Y-401-Login.md` | nuevo (este documento) |
 | `TaskFlow.Blazor/Components/Layout/MainLayout.razor` | editado (ancho del dropdown de usuario) |
 | `TaskFlow.Blazor/Components/Pages/Login.razor` | editado (se quita `forceLoad: true` en login y registro) |
+| `TaskFlow.Blazor/Services/AuthTokenStore.cs` | editado (gate `Ready`/`MarkReady()`) |
+| `TaskFlow.Blazor/Services/AuthState.cs` | editado (marca el gate en `LoadAsync()` y `Apply()`) |
+| `TaskFlow.Blazor/Services/AuthTokenHandler.cs` | editado (espera el gate antes de cada pedido) |

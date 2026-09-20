@@ -46,6 +46,10 @@ public class AuthState
         {
             // Entorno prerender sin JS disponible; se recuperará en el ciclo interactivo.
         }
+        finally
+        {
+            _tokenStore.MarkReady();
+        }
     }
 
     public async Task<bool> LoginAsync(string email, string password)
@@ -84,5 +88,6 @@ public class AuthState
         _tokenStore.Token = token;
         _tokenStore.Email = email;
         Roles = roles ?? new List<string>();
+        _tokenStore.MarkReady();
     }
 }
