@@ -38,8 +38,12 @@ public class ProjectService : IProjectService
 
     public async Task<Result<ProjectDto>> CreateAsync(CreateProjectDto dto, Guid ownerId)
     {
+        if (dto.EndDate.HasValue && dto.EndDate.Value.Date < dto.StartDate.Date)
+            return Result<ProjectDto>.Failure("End date must be on or after the start date");
+
         var project = _mapper.Map<Project>(dto);
         project.OwnerId = ownerId;
+        project.Progress = Math.Clamp(dto.Progress, 0, 100);
 
         var created = await _unitOfWork.Projects.AddAsync(project);
         await _unitOfWork.SaveChangesAsync();
@@ -54,9 +58,14 @@ public class ProjectService : IProjectService
         if (project == null)
             return Result<ProjectDto>.Failure($"Project with id {id} not found");
 
+        if (dto.EndDate.HasValue && dto.EndDate.Value.Date < project.StartDate.Date)
+            return Result<ProjectDto>.Failure("End date must be on or after the start date");
+
         project.Name = dto.Name;
         project.Description = dto.Description;
         project.EndDate = dto.EndDate;
+        project.Version = dto.Version;
+        project.Progress = Math.Clamp(dto.Progress, 0, 100);
         project.UpdatedAt = DateTime.UtcNow;
 
         await _unitOfWork.Projects.UpdateAsync(project);

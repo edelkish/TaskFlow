@@ -81,7 +81,7 @@
         <div class="card-body border-bottom">
             <div class="card card-outline card-primary mb-0">
                 <div class="card-body">
-                    <h6 class="card-title mb-3">Nuevo proyecto</h6>
+                    <h6 class="mb-3">Nuevo proyecto</h6>
                     <form class="needs-validation" novalidate @ref="_createForm">
                         <div class="row g-2">
                             <div class="col-md-4">
@@ -95,14 +95,22 @@
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label">Fecha inicio</label>
-                                <input type="date" class="form-control" required
-                                       @bind="NewStartDate" @bind:format="yyyy-MM-dd" />
+                                <FlatpickrDate @bind-Value="NewStartDate" Required="true" />
                                 <div class="invalid-feedback">La fecha de inicio es obligatoria.</div>
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label">Fecha fin</label>
-                                <input type="date" class="form-control"
-                                       @bind="NewEndDate" @bind:format="yyyy-MM-dd" />
+                                <FlatpickrDate @bind-Value="NewEndDate" />
+                            </div>
+                        </div>
+                        <div class="row g-2 mt-2">
+                            <div class="col-md-3">
+                                <label class="form-label">Versión</label>
+                                <input type="text" class="form-control" maxlength="50" @bind="NewVersion" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Progreso (%)</label>
+                                <input type="number" class="form-control" min="0" max="100" @bind="NewProgress" />
                             </div>
                         </div>
                         <div class="mt-3">
@@ -124,6 +132,8 @@
                     <tr>
                         <th>Proyecto</th>
                         <th>Estado</th>
+                        <th>Versión</th>
+                        <th>Progreso</th>
                         <th>Tareas</th>
                         <th>Inicio</th>
                         <th>Fin</th>
@@ -133,7 +143,7 @@
                 <tbody>
                     @if (PagedProjects.Count == 0)
                     {
-                        <tr><td colspan="6" class="text-center text-secondary">No hay proyectos que coincidan con el filtro.</td></tr>
+                        <tr><td colspan="8" class="text-center text-secondary">No hay proyectos que coincidan con el filtro.</td></tr>
                     }
                     else
                     {
@@ -157,6 +167,17 @@
                                         <span class="badge text-bg-secondary">Finalizado</span>
                                     }
                                 </td>
+                                <td>@(string.IsNullOrWhiteSpace(p.Version) ? "—" : p.Version)</td>
+                                <td style="min-width: 10rem">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="progress flex-grow-1" style="height: 6px">
+                                            <div class="progress-bar @ProgressBarClass(p.Progress)" role="progressbar"
+                                                 style="width: @(p.Progress)%" aria-valuenow="@p.Progress"
+                                                 aria-valuemin="0" aria-valuemax="100"></div>
+                                        </div>
+                                        <small class="text-secondary" style="min-width: 2.25rem">@p.Progress%</small>
+                                    </div>
+                                </td>
                                 <td><span class="badge text-bg-primary">@p.TaskCount</span></td>
                                 <td class="text-nowrap">@p.StartDate.ToString("dd/MM/yyyy")</td>
                                 <td class="text-nowrap">@(p.EndDate.HasValue ? p.EndDate.Value.ToString("dd/MM/yyyy") : "—")</td>
@@ -174,7 +195,7 @@
                             @if (Edit != null && Edit.Id == p.Id)
                             {
                                 <tr>
-                                    <td colspan="6">
+                                    <td colspan="8">
                                         <form class="needs-validation" novalidate @ref="_editForm">
                                             <div class="row g-2">
                                                 <div class="col-md-4">
@@ -188,8 +209,7 @@
                                                 </div>
                                                 <div class="col-md-2">
                                                     <label class="form-label">Fecha fin</label>
-                                                    <input type="date" class="form-control form-control-sm"
-                                                           @bind="EditEndDate" @bind:format="yyyy-MM-dd" />
+                                                    <FlatpickrDate @bind-Value="EditEndDate" CssClass="form-control form-control-sm" />
                                                 </div>
                                                 <div class="col-md-2 d-flex align-items-end">
                                                     <button type="button" class="btn btn-sm btn-success" @onclick="() => SaveEditAsync(p)">
@@ -198,6 +218,16 @@
                                                     <button type="button" class="btn btn-sm btn-secondary ms-1" @onclick="CancelEdit">
                                                         <i class="bi bi-x-lg"></i>
                                                     </button>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2 mt-2">
+                                                <div class="col-md-3">
+                                                    <label class="form-label">Versión</label>
+                                                    <input type="text" class="form-control form-control-sm" maxlength="50" @bind="EditVersion" />
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label">Progreso (%)</label>
+                                                    <input type="number" class="form-control form-control-sm" min="0" max="100" @bind="EditProgress" />
                                                 </div>
                                             </div>
                                         </form>
@@ -249,13 +279,17 @@
 
     private string NewName { get; set; } = string.Empty;
     private string NewDescription { get; set; } = string.Empty;
-    private DateTime NewStartDate { get; set; } = DateTime.Today;
+    private DateTime? NewStartDate { get; set; } = DateTime.Today;
     private DateTime? NewEndDate { get; set; }
+    private string NewVersion { get; set; } = string.Empty;
+    private int NewProgress { get; set; }
 
     private TaskFlow.Application.DTOs.ProjectDto? Edit { get; set; }
     private string EditName { get; set; } = string.Empty;
     private string EditDescription { get; set; } = string.Empty;
     private DateTime? EditEndDate { get; set; }
+    private string EditVersion { get; set; } = string.Empty;
+    private int EditProgress { get; set; }
 
     private List<TaskFlow.Application.DTOs.ProjectDto> FilteredProjects =>
         Projects
@@ -277,6 +311,14 @@
 
     private static bool IsActive(TaskFlow.Application.DTOs.ProjectDto project)
         => !project.EndDate.HasValue || project.EndDate.Value.Date >= DateTime.Today;
+
+    private static string ProgressBarClass(int progress) => progress switch
+    {
+        >= 100 => "bg-success",
+        >= 60 => "bg-primary",
+        >= 30 => "bg-info",
+        _ => "bg-warning"
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -315,6 +357,12 @@
             return;
         }
 
+        if (NewEndDate.HasValue && NewEndDate.Value.Date < (NewStartDate ?? DateTime.Today).Date)
+        {
+            await Toast.ErrorAsync("La fecha de fin debe ser igual o posterior a la fecha de inicio.");
+            return;
+        }
+
         Busy = true;
         try
         {
@@ -322,14 +370,18 @@
             {
                 Name = NewName.Trim(),
                 Description = string.IsNullOrWhiteSpace(NewDescription) ? null : NewDescription.Trim(),
-                StartDate = NewStartDate,
-                EndDate = NewEndDate
+                StartDate = NewStartDate ?? DateTime.Today,
+                EndDate = NewEndDate,
+                Version = string.IsNullOrWhiteSpace(NewVersion) ? null : NewVersion.Trim(),
+                Progress = NewProgress
             });
             ShowCreate = false;
             NewName = string.Empty;
             NewDescription = string.Empty;
             NewStartDate = DateTime.Today;
             NewEndDate = null;
+            NewVersion = string.Empty;
+            NewProgress = 0;
             await Toast.SuccessAsync("Proyecto creado correctamente.");
             await LoadAsync();
         }
@@ -354,6 +406,8 @@
         EditName = project.Name;
         EditDescription = project.Description ?? string.Empty;
         EditEndDate = project.EndDate;
+        EditVersion = project.Version ?? string.Empty;
+        EditProgress = project.Progress;
     }
 
     private void CancelEdit()
@@ -368,6 +422,12 @@
             return;
         }
 
+        if (EditEndDate.HasValue && EditEndDate.Value.Date < project.StartDate.Date)
+        {
+            await Toast.ErrorAsync("La fecha de fin debe ser igual o posterior a la fecha de inicio.");
+            return;
+        }
+
         Busy = true;
         try
         {
@@ -375,7 +435,9 @@
             {
                 Name = EditName.Trim(),
                 Description = string.IsNullOrWhiteSpace(EditDescription) ? null : EditDescription.Trim(),
-                EndDate = EditEndDate
+                EndDate = EditEndDate,
+                Version = string.IsNullOrWhiteSpace(EditVersion) ? null : EditVersion.Trim(),
+                Progress = EditProgress
             });
             CancelEdit();
             await Toast.SuccessAsync("Proyecto actualizado correctamente.");

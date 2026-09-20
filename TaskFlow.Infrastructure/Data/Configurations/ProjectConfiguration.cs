@@ -17,6 +17,16 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.Property(p => p.Description)
             .HasMaxLength(2000);
 
+        builder.Property(p => p.Version)
+            .HasMaxLength(50);
+
+        builder.Property(p => p.Progress)
+            .IsRequired()
+            .HasDefaultValue(0);
+
+        builder.ToTable(t => t.HasCheckConstraint(
+            "CK_Projects_Progress_Range", "[Progress] >= 0 AND [Progress] <= 100"));
+
         builder.HasIndex(p => p.Name)
             .IsUnique();
 

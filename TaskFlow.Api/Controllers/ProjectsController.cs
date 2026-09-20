@@ -53,7 +53,7 @@ public class ProjectsController : ControllerBase
     {
         var result = await _projectService.UpdateAsync(id, dto);
         if (!result.IsSuccess)
-            return NotFound(result.Error);
+            return result.Error!.Contains("not found") ? NotFound(result.Error) : BadRequest(result.Error);
 
         return Ok(result.Value);
     }

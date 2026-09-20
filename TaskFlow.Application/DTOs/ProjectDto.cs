@@ -7,6 +7,8 @@ public record ProjectDto
     public string? Description { get; init; }
     public DateTime StartDate { get; init; }
     public DateTime? EndDate { get; init; }
+    public string? Version { get; init; }
+    public int Progress { get; init; }
     public Guid OwnerId { get; init; }
     public DateTime CreatedAt { get; init; }
     public int TaskCount { get; init; }
@@ -18,6 +20,8 @@ public record CreateProjectDto
     public string? Description { get; init; }
     public DateTime StartDate { get; init; }
     public DateTime? EndDate { get; init; }
+    public string? Version { get; init; }
+    public int Progress { get; init; } = 0;
 }
 
 public record UpdateProjectDto
@@ -25,4 +29,6 @@ public record UpdateProjectDto
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
     public DateTime? EndDate { get; init; }
+    public string? Version { get; init; }
+    public int Progress { get; init; }
 }
