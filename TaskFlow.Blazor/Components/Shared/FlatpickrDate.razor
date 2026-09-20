@@ -28,8 +28,20 @@
     [JSInvokable]
     public async Task OnFlatpickrChange(string? dateStr)
     {
-        Value = string.IsNullOrWhiteSpace(dateStr) ? null : DateTime.Parse(dateStr);
-        await ValueChanged.InvokeAsync(Value);
+        if (string.IsNullOrWhiteSpace(dateStr))
+        {
+            Value = null;
+            await ValueChanged.InvokeAsync(Value);
+            return;
+        }
+
+        if (DateTime.TryParse(dateStr, out var parsed))
+        {
+            Value = parsed;
+            await ValueChanged.InvokeAsync(Value);
+        }
+        // Texto no parseable (tipeo manual invalido con allowInput): se ignora
+        // sin tocar Value, en vez de lanzar y tirar abajo el circuito de Blazor.
     }
 
     public async ValueTask DisposeAsync()
