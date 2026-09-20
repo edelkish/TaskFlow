@@ -1,88 +1,403 @@
-﻿@page "/dashboard"
+@page "/dashboard"
 @inherits TaskFlow.Blazor.Components.AuthenticatedPageBase
 @inject TaskFlow.Blazor.Services.ApiClient Api
 
-<PageTitle>Dashboard</PageTitle>
+<PageTitle>Proyectos</PageTitle>
 
-<div class="row">
-    <div class="col-lg-3 col-6">
-        <div class="small-box text-bg-secondary">
-            <div class="inner">
-                <h3>@Periods.Count</h3>
-                <p>Periodos</p>
-            </div>
-            <div class="icon"><i class="bi bi-calendar-month"></i></div>
-            <a href="periodos" class="small-box-footer">Ver todos <i class="bi bi-arrow-right-circle ms-1"></i></a>
+<div class="app-content-header">
+    <div class="row">
+        <div class="col-sm-6">
+            <h1 class="mb-0 fs-3">Proyectos</h1>
         </div>
-    </div>
-    <div class="col-lg-3 col-6">
-        <div class="small-box text-bg-primary">
-            <div class="inner">
-                <h3>@Groups.Count</h3>
-                <p>Grupos de tareas</p>
-            </div>
-            <div class="icon"><i class="bi bi-diagram-3"></i></div>
-            <a href="grupos" class="small-box-footer">Ver todos <i class="bi bi-arrow-right-circle ms-1"></i></a>
-        </div>
-    </div>
-    <div class="col-lg-3 col-6">
-        <div class="small-box text-bg-success">
-            <div class="inner">
-                <h3>@Tasks.Count</h3>
-                <p>Tareas planificadas</p>
-            </div>
-            <div class="icon"><i class="bi bi-list-check"></i></div>
-            <a href="tareas" class="small-box-footer">Gestionar <i class="bi bi-arrow-right-circle ms-1"></i></a>
-        </div>
-    </div>
-    <div class="col-lg-3 col-6">
-        <div class="small-box text-bg-warning">
-            <div class="inner">
-                <h3>@People.Count</h3>
-                <p>Personas</p>
-            </div>
-            <div class="icon"><i class="bi bi-people"></i></div>
-            <a href="personas" class="small-box-footer">Ver todos <i class="bi bi-arrow-right-circle ms-1"></i></a>
+        <div class="col-sm-6">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb float-sm-end">
+                    <li class="breadcrumb-item"><a href="dashboard">Inicio</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Proyectos</li>
+                </ol>
+            </nav>
         </div>
     </div>
 </div>
 
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title"><i class="bi bi-box-arrow-down me-2"></i>Importar planificación</h3>
-            </div>
+<!-- Summary cards -->
+<div class="row g-3 mb-3">
+    <div class="col-md-3 col-6">
+        <div class="card h-100">
             <div class="card-body">
-                <p class="mb-2">
-                    Cargue el archivo TXT mensual para crear automáticamente los grupos de trabajo
-                    (Dev / QA / Team Lead) y sus tareas por función.
-                </p>
-                <a class="btn btn-primary" href="import">
-                    <i class="bi bi-upload me-1"></i> Ir a importación
-                </a>
+                <p class="text-secondary small mb-1">Proyectos totales</p>
+                <h3 class="mb-0 fw-bold">@Projects.Count</h3>
             </div>
         </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-secondary small mb-1">Activos</p>
+                <h3 class="mb-0 fw-bold text-success">@Projects.Count(IsActive)</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-secondary small mb-1">Finalizados</p>
+                <h3 class="mb-0 fw-bold text-secondary">@Projects.Count(p => !IsActive(p))</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <p class="text-secondary small mb-1">Tareas planificadas</p>
+                <h3 class="mb-0 fw-bold">@Projects.Sum(p => p.TaskCount)</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toolbar -->
+<div class="card">
+    <div class="card-header d-flex flex-wrap gap-2 align-items-center">
+        <h3 class="card-title mb-0 me-auto">Todos los proyectos</h3>
+        <div class="input-group input-group-sm" style="width: 16rem">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="search" class="form-control" placeholder="Buscar proyectos…"
+                   @bind="SearchTerm" @bind:event="oninput" @bind:after="ResetPage" />
+        </div>
+        <select class="form-select form-select-sm" style="width: 10rem"
+                @bind="StatusFilter" @bind:after="ResetPage">
+            <option value="">Todos los estados</option>
+            <option value="activos">Activos</option>
+            <option value="finalizados">Finalizados</option>
+        </select>
+        <button class="btn btn-primary btn-sm" type="button" @onclick="() => ShowCreate = !ShowCreate">
+            <i class="bi bi-plus-lg me-1"></i> Nuevo proyecto
+        </button>
+    </div>
+
+    @if (ShowCreate)
+    {
+        <div class="card-body border-bottom">
+            <div class="card card-outline card-primary mb-0">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">Nuevo proyecto</h6>
+                    <form class="needs-validation" novalidate @ref="_createForm">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label">Nombre</label>
+                                <input type="text" class="form-control" maxlength="200" required @bind="NewName" />
+                                <div class="invalid-feedback">El nombre es obligatorio.</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Descripción</label>
+                                <input type="text" class="form-control" @bind="NewDescription" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Fecha inicio</label>
+                                <input type="date" class="form-control" required
+                                       @bind="NewStartDate" @bind:format="yyyy-MM-dd" />
+                                <div class="invalid-feedback">La fecha de inicio es obligatoria.</div>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Fecha fin</label>
+                                <input type="date" class="form-control"
+                                       @bind="NewEndDate" @bind:format="yyyy-MM-dd" />
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-primary btn-sm" disabled="@Busy" @onclick="CreateAsync">
+                                <i class="bi bi-check-lg me-1"></i> Guardar
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm ms-1" @onclick="() => ShowCreate = false">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Proyecto</th>
+                        <th>Estado</th>
+                        <th>Tareas</th>
+                        <th>Inicio</th>
+                        <th>Fin</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (PagedProjects.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-center text-secondary">No hay proyectos que coincidan con el filtro.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var p in PagedProjects)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="fw-semibold">@p.Name</span>
+                                    @if (!string.IsNullOrWhiteSpace(p.Description))
+                                    {
+                                        <div class="small text-secondary">@p.Description</div>
+                                    }
+                                </td>
+                                <td>
+                                    @if (IsActive(p))
+                                    {
+                                        <span class="badge text-bg-success">Activo</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge text-bg-secondary">Finalizado</span>
+                                    }
+                                </td>
+                                <td><span class="badge text-bg-primary">@p.TaskCount</span></td>
+                                <td class="text-nowrap">@p.StartDate.ToString("dd/MM/yyyy")</td>
+                                <td class="text-nowrap">@(p.EndDate.HasValue ? p.EndDate.Value.ToString("dd/MM/yyyy") : "—")</td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-secondary" type="button" title="Editar" @onclick="() => ToggleEdit(p)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" type="button" title="Eliminar" @onclick="() => DeleteAsync(p)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            @if (Edit != null && Edit.Id == p.Id)
+                            {
+                                <tr>
+                                    <td colspan="6">
+                                        <form class="needs-validation" novalidate @ref="_editForm">
+                                            <div class="row g-2">
+                                                <div class="col-md-4">
+                                                    <label class="form-label">Nombre</label>
+                                                    <input type="text" class="form-control form-control-sm" maxlength="200" required @bind="EditName" />
+                                                    <div class="invalid-feedback">El nombre es obligatorio.</div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label">Descripción</label>
+                                                    <input type="text" class="form-control form-control-sm" @bind="EditDescription" />
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label">Fecha fin</label>
+                                                    <input type="date" class="form-control form-control-sm"
+                                                           @bind="EditEndDate" @bind:format="yyyy-MM-dd" />
+                                                </div>
+                                                <div class="col-md-2 d-flex align-items-end">
+                                                    <button type="button" class="btn btn-sm btn-success" @onclick="() => SaveEditAsync(p)">
+                                                        <i class="bi bi-check-lg"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-secondary ms-1" @onclick="CancelEdit">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card-footer d-flex justify-content-between align-items-center">
+        <small class="text-secondary">Mostrando @PagedProjects.Count de @FilteredProjects.Count</small>
+        <nav aria-label="Paginación">
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item @(CurrentPage <= 1 ? "disabled" : null)">
+                    <a class="page-link" href="#" @onclick="() => GoToPage(CurrentPage - 1)" @onclick:preventDefault>Anterior</a>
+                </li>
+                @for (var page = 1; page <= TotalPages; page++)
+                {
+                    var pageNumber = page;
+                    <li class="page-item @(pageNumber == CurrentPage ? "active" : null)">
+                        <a class="page-link" href="#" @onclick="() => GoToPage(pageNumber)" @onclick:preventDefault>@pageNumber</a>
+                    </li>
+                }
+                <li class="page-item @(CurrentPage >= TotalPages ? "disabled" : null)">
+                    <a class="page-link" href="#" @onclick="() => GoToPage(CurrentPage + 1)" @onclick:preventDefault>Siguiente</a>
+                </li>
+            </ul>
+        </nav>
     </div>
 </div>
 
 @code {
-    private List<TaskFlow.Application.DTOs.PeriodDto> Periods { get; set; } = new();
-    private List<TaskFlow.Application.DTOs.TaskGroupDto> Groups { get; set; } = new();
-    private List<TaskFlow.Application.DTOs.PlanningTaskDto> Tasks { get; set; } = new();
-    private List<TaskFlow.Application.DTOs.PersonDto> People { get; set; } = new();
+    private const int PageSize = 8;
+
+    private ElementReference _createForm;
+    private ElementReference _editForm;
+
+    private List<TaskFlow.Application.DTOs.ProjectDto> Projects { get; set; } = new();
+    private bool ShowCreate { get; set; }
+    private bool Busy { get; set; }
+    private int CurrentPage { get; set; } = 1;
+
+    private string SearchTerm { get; set; } = string.Empty;
+    private string StatusFilter { get; set; } = string.Empty;
+
+    private string NewName { get; set; } = string.Empty;
+    private string NewDescription { get; set; } = string.Empty;
+    private DateTime NewStartDate { get; set; } = DateTime.Today;
+    private DateTime? NewEndDate { get; set; }
+
+    private TaskFlow.Application.DTOs.ProjectDto? Edit { get; set; }
+    private string EditName { get; set; } = string.Empty;
+    private string EditDescription { get; set; } = string.Empty;
+    private DateTime? EditEndDate { get; set; }
+
+    private List<TaskFlow.Application.DTOs.ProjectDto> FilteredProjects =>
+        Projects
+            .Where(p => string.IsNullOrWhiteSpace(SearchTerm)
+                || p.Name.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase)
+                || (p.Description?.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase) ?? false))
+            .Where(p => StatusFilter switch
+            {
+                "activos" => IsActive(p),
+                "finalizados" => !IsActive(p),
+                _ => true
+            })
+            .ToList();
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(FilteredProjects.Count / (double)PageSize));
+
+    private List<TaskFlow.Application.DTOs.ProjectDto> PagedProjects =>
+        FilteredProjects.Skip((CurrentPage - 1) * PageSize).Take(PageSize).ToList();
+
+    private static bool IsActive(TaskFlow.Application.DTOs.ProjectDto project)
+        => !project.EndDate.HasValue || project.EndDate.Value.Date >= DateTime.Today;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        LoadError = null;
         try
         {
-            Periods = await Api.GetPeriodsAsync() ?? new();
-            Groups = await Api.GetGroupsAsync() ?? new();
-            Tasks = Groups.SelectMany(g => g.Tasks).ToList();
-            People = await Api.GetPeopleAsync() ?? new();
+            Projects = await Api.GetProjectsAsync() ?? new();
         }
-        catch
+        catch (Exception ex)
         {
+            Projects = new();
+            LoadError = ex.Message;
+        }
+    }
+
+    private void ResetPage() => CurrentPage = 1;
+
+    private void GoToPage(int page)
+    {
+        if (page < 1 || page > TotalPages)
+        {
+            return;
+        }
+        CurrentPage = page;
+    }
+
+    private async Task CreateAsync()
+    {
+        if (!await Toast.ValidateFormAsync(_createForm))
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            await Api.CreateProjectAsync(new TaskFlow.Application.DTOs.CreateProjectDto(
+                NewName.Trim(),
+                string.IsNullOrWhiteSpace(NewDescription) ? null : NewDescription.Trim(),
+                NewStartDate,
+                NewEndDate));
+            ShowCreate = false;
+            NewName = string.Empty;
+            NewDescription = string.Empty;
+            NewStartDate = DateTime.Today;
+            NewEndDate = null;
+            await Toast.SuccessAsync("Proyecto creado correctamente.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await Toast.ErrorAsync(ex.Message);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void ToggleEdit(TaskFlow.Application.DTOs.ProjectDto project)
+    {
+        if (Edit?.Id == project.Id)
+        {
+            CancelEdit();
+            return;
+        }
+        Edit = project;
+        EditName = project.Name;
+        EditDescription = project.Description ?? string.Empty;
+        EditEndDate = project.EndDate;
+    }
+
+    private void CancelEdit()
+    {
+        Edit = null;
+    }
+
+    private async Task SaveEditAsync(TaskFlow.Application.DTOs.ProjectDto project)
+    {
+        if (!await Toast.ValidateFormAsync(_editForm))
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            await Api.UpdateProjectAsync(project.Id, new TaskFlow.Application.DTOs.UpdateProjectDto(
+                EditName.Trim(),
+                string.IsNullOrWhiteSpace(EditDescription) ? null : EditDescription.Trim(),
+                EditEndDate));
+            CancelEdit();
+            await Toast.SuccessAsync("Proyecto actualizado correctamente.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await Toast.ErrorAsync(ex.Message);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task DeleteAsync(TaskFlow.Application.DTOs.ProjectDto project)
+    {
+        try
+        {
+            await Api.DeleteProjectAsync(project.Id);
+            await Toast.SuccessAsync("Proyecto eliminado.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await Toast.ErrorAsync(ex.Message);
         }
     }
 }
