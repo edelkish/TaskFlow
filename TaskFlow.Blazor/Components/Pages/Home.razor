@@ -318,11 +318,13 @@
         Busy = true;
         try
         {
-            await Api.CreateProjectAsync(new TaskFlow.Application.DTOs.CreateProjectDto(
-                NewName.Trim(),
-                string.IsNullOrWhiteSpace(NewDescription) ? null : NewDescription.Trim(),
-                NewStartDate,
-                NewEndDate));
+            await Api.CreateProjectAsync(new TaskFlow.Application.DTOs.CreateProjectDto
+            {
+                Name = NewName.Trim(),
+                Description = string.IsNullOrWhiteSpace(NewDescription) ? null : NewDescription.Trim(),
+                StartDate = NewStartDate,
+                EndDate = NewEndDate
+            });
             ShowCreate = false;
             NewName = string.Empty;
             NewDescription = string.Empty;
@@ -369,10 +371,12 @@
         Busy = true;
         try
         {
-            await Api.UpdateProjectAsync(project.Id, new TaskFlow.Application.DTOs.UpdateProjectDto(
-                EditName.Trim(),
-                string.IsNullOrWhiteSpace(EditDescription) ? null : EditDescription.Trim(),
-                EditEndDate));
+            await Api.UpdateProjectAsync(project.Id, new TaskFlow.Application.DTOs.UpdateProjectDto
+            {
+                Name = EditName.Trim(),
+                Description = string.IsNullOrWhiteSpace(EditDescription) ? null : EditDescription.Trim(),
+                EndDate = EditEndDate
+            });
             CancelEdit();
             await Toast.SuccessAsync("Proyecto actualizado correctamente.");
             await LoadAsync();

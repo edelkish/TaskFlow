@@ -1,27 +1,28 @@
-using TaskFlow.Domain.Enums;
-
 namespace TaskFlow.Application.DTOs;
 
-public record ProjectDto(
-    Guid Id,
-    string Name,
-    string? Description,
-    DateTime StartDate,
-    DateTime? EndDate,
-    Guid OwnerId,
-    DateTime CreatedAt,
-    int TaskCount
-);
+public record ProjectDto
+{
+    public Guid Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string? Description { get; init; }
+    public DateTime StartDate { get; init; }
+    public DateTime? EndDate { get; init; }
+    public Guid OwnerId { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public int TaskCount { get; init; }
+}
 
-public record CreateProjectDto(
-    string Name,
-    string? Description,
-    DateTime StartDate,
-    DateTime? EndDate
-);
+public record CreateProjectDto
+{
+    public string Name { get; init; } = string.Empty;
+    public string? Description { get; init; }
+    public DateTime StartDate { get; init; }
+    public DateTime? EndDate { get; init; }
+}
 
-public record UpdateProjectDto(
-    string Name,
-    string? Description,
-    DateTime? EndDate
-);
+public record UpdateProjectDto
+{
+    public string Name { get; init; } = string.Empty;
+    public string? Description { get; init; }
+    public DateTime? EndDate { get; init; }
+}
