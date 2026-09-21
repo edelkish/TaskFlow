@@ -10,6 +10,7 @@ public abstract class AuthenticatedPageBase : ComponentBase
     [Inject] protected ToastService Toast { get; set; } = default!;
 
     protected string? LoadError { get; set; }
+    protected bool IsLoading { get; set; } = true;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

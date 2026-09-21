@@ -30,6 +30,12 @@
             </div>
 
             <div class="card-body">
+                @if (IsLoading)
+                {
+                    <LoadingSpinner />
+                }
+                else
+                {
                 @if (ShowCreate)
                 {
                     <div class="card card-outline card-primary mb-3">
@@ -136,6 +142,7 @@
                         }
                     }
                 </div>
+                }
             </div>
         </div>
     </div>
@@ -204,6 +211,10 @@
         {
             Groups = new();
             LoadError = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 

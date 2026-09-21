@@ -92,7 +92,11 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @if (Batches == null)
+                        @if (IsLoading)
+                        {
+                            <tr><td colspan="8"><LoadingSpinner Compact="true" /></td></tr>
+                        }
+                        else if (Batches == null || Batches.Count == 0)
                         {
                             <tr><td colspan="8" class="text-center text-secondary">Sin importaciones registradas.</td></tr>
                         }
@@ -143,6 +147,10 @@
         {
             Batches = new();
             LoadError = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 

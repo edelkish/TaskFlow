@@ -14,6 +14,12 @@
                 </button>
             </div>
             <div class="card-body">
+                @if (IsLoading)
+                {
+                    <LoadingSpinner />
+                }
+                else
+                {
                 @if (ShowCreate)
                 {
                     <div class="card card-outline card-primary mb-3">
@@ -112,6 +118,7 @@
                         </tbody>
                     </table>
                 </div>
+                }
             </div>
         </div>
     </div>
@@ -148,6 +155,10 @@
         {
             People = new();
             LoadError = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 

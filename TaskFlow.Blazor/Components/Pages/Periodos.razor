@@ -12,6 +12,12 @@
             </div>
 
             <div class="card-body">
+                @if (IsLoading)
+                {
+                    <LoadingSpinner />
+                }
+                else
+                {
                 <form class="needs-validation" novalidate @ref="_createForm" @onsubmit="CreateAsync" @onsubmit:preventDefault>
                     <div class="row g-2 align-items-end mb-3">
                         <div class="col-md-4">
@@ -74,6 +80,7 @@
                         </tbody>
                     </table>
                 </div>
+                }
             </div>
         </div>
     </div>
@@ -104,6 +111,10 @@
         {
             Periods = new();
             LoadError = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 
