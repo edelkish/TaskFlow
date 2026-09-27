@@ -23,9 +23,12 @@
                             <option value="@p.Id">@p.Name — @p.Year @(new System.Globalization.CultureInfo("es-ES").DateTimeFormat.GetMonthName(p.Month))</option>
                         }
                     </select>
-                    <button class="btn btn-sm btn-primary" @onclick="() => ShowCreate = true">
-                        <i class="bi bi-plus-lg me-1"></i> Nuevo grupo
-                    </button>
+                    @if (AuthState.CanEditMasterData)
+                    {
+                        <button class="btn btn-sm btn-primary" @onclick="() => ShowCreate = true">
+                            <i class="bi bi-plus-lg me-1"></i> Nuevo grupo
+                        </button>
+                    }
                 </div>
             </div>
 

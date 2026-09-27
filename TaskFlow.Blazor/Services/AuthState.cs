@@ -17,6 +17,13 @@ public class AuthState
 
     public bool IsAuthenticated => _tokenStore.IsAuthenticated;
     public bool IsAdmin => Roles.Contains("Admin");
+
+    /// <summary>Curaduría de maestros: Admin y Planificación.</summary>
+    public bool CanEditMasterData => IsAdmin || Roles.Contains("Planificación");
+
+    /// <summary>Developer no prepara ni importa TXT.</summary>
+    public bool CanImport => CanEditMasterData || Roles.Contains("TeamLead") || Roles.Contains("QA");
+
     public string? Email => _tokenStore.Email;
 
     public AuthState(AuthTokenStore tokenStore, ApiClient apiClient, IJSRuntime js)

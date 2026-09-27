@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TaskFlow.Api.Authorization;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 
@@ -42,6 +43,7 @@ public class TaskGroupsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AppPolicies.MasterDataWrite)]
     public async Task<IActionResult> Create([FromBody] CreateTaskGroupDto dto)
     {
         var result = await _taskGroupService.CreateAsync(dto);
@@ -51,6 +53,7 @@ public class TaskGroupsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
     }
 
+    [Authorize(Policy = AppPolicies.MasterDataWrite)]
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTaskGroupDto dto)
     {
@@ -61,6 +64,7 @@ public class TaskGroupsController : ControllerBase
         return Ok(result.Value);
     }
 
+    [Authorize(Policy = AppPolicies.MasterDataWrite)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

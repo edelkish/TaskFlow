@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using TaskFlow.Api.Authorization;
 using TaskFlow.Api.Middleware;
 using TaskFlow.Domain.Interfaces;
 using TaskFlow.Infrastructure;
@@ -36,7 +37,20 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(AppPolicies.MasterDataWrite, policy =>
+        policy.RequireRole(
+            IdentitySeeder.AdminRole,
+            IdentitySeeder.PlannerRole));
+
+    options.AddPolicy(AppPolicies.ImportWrite, policy =>
+        policy.RequireRole(
+            IdentitySeeder.AdminRole,
+            IdentitySeeder.PlannerRole,
+            IdentitySeeder.TeamLeadRole,
+            IdentitySeeder.QaRole));
+});
 
 // Controllers
 builder.Services.AddControllers();
@@ -109,6 +123,11 @@ using (var scope = app.Services.CreateScope())
     var userManager = services.GetRequiredService<UserManager<IdentityUser>>();
     var unitOfWork = services.GetRequiredService<IUnitOfWork>();
     await IdentitySeeder.SeedAsync(roleManager, userManager, unitOfWork);
+
+    // Catálogo de cargos + backfill de cargos a partir de los TaskGroups históricos.
+    // Debe correr antes de usar la importación: sin cargos asignados, la validación
+    // estricta rechazaría todo archivo existente.
+    await CatalogSeeder.SeedAsync(unitOfWork);
 }
 
 app.Run();

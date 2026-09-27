@@ -28,7 +28,8 @@ public class PersonService : IPersonService
     public async Task<Result<IEnumerable<PersonDto>>> GetAllAsync(CancellationToken ct = default)
     {
         var people = await _unitOfWork.People.GetAllAsync();
-        return Result<IEnumerable<PersonDto>>.Success(_mapper.Map<IEnumerable<PersonDto>>(people));
+        var dtos = await MapWithRolesAsync(people, ct);
+        return Result<IEnumerable<PersonDto>>.Success(dtos);
     }
 
     public async Task<Result<PersonDto>> GetAsync(Guid id, CancellationToken ct = default)
@@ -37,7 +38,72 @@ public class PersonService : IPersonService
         if (person == null)
             return Result<PersonDto>.Failure("Persona no encontrada.");
 
-        return Result<PersonDto>.Success(_mapper.Map<PersonDto>(person));
+        var mapped = await MapWithRolesAsync([person], ct);
+        return Result<PersonDto>.Success(mapped.First());
+    }
+
+    /// <summary>
+    /// Los cargos no se mapean con AutoMapper porque viven en la tabla puente
+    /// PersonRole y requieren una consulta aparte.
+    /// </summary>
+    private async Task<List<PersonDto>> MapWithRolesAsync(IEnumerable<Person> people, CancellationToken ct)
+    {
+        var result = new List<PersonDto>();
+
+        foreach (var person in people)
+        {
+            var roles = await _unitOfWork.PersonRoles.GetRolesByPersonAsync(person.Id);
+            var dto = _mapper.Map<PersonDto>(person);
+            result.Add(dto with
+            {
+                Roles = roles.Select(r => r.Name).ToList(),
+                RoleIds = roles.Select(r => r.Id).ToList()
+            });
+        }
+
+        return result;
+    }
+
+    public async Task<Result<PersonDto>> SetRolesAsync(Guid id, SetPersonRolesDto dto, CancellationToken ct = default)
+    {
+        var person = await _unitOfWork.People.GetByIdAsync(id);
+        if (person == null)
+            return Result<PersonDto>.Failure("Persona no encontrada.");
+
+        var requested = dto.RoleIds.Distinct().ToList();
+
+        if (requested.Count > 0)
+        {
+            var known = await _unitOfWork.Roles.GetAllAsync();
+            var knownIds = known.Select(r => r.Id).ToHashSet();
+
+            var unknown = requested.Where(r => !knownIds.Contains(r)).ToList();
+            if (unknown.Count > 0)
+            {
+                return Result<PersonDto>.Failure(
+                    $"Cargo(s) inexistente(s): {string.Join(", ", unknown.Select(u => u.ToString()))}.");
+            }
+        }
+
+        var current = await _unitOfWork.PersonRoles.GetRoleIdsByPersonAsync(id);
+
+        foreach (var roleId in current.Except(requested))
+        {
+            await _unitOfWork.PersonRoles.RemoveAsync(id, roleId);
+        }
+
+        foreach (var roleId in requested.Except(current))
+        {
+            await _unitOfWork.PersonRoles.AddAsync(new PersonRole
+            {
+                PersonId = id,
+                RoleId = roleId
+            });
+        }
+
+        await _unitOfWork.SaveChangesAsync(ct);
+
+        return await GetAsync(id, ct);
     }
 
     public async Task<Result<PersonDto>> CreateAsync(CreatePersonDto dto, CancellationToken ct = default)
@@ -89,6 +155,8 @@ public class PersonService : IPersonService
         if (person == null)
             return Result<bool>.Failure("Persona no encontrada.");
 
+        // Las asignaciones de cargo van en cascada con la persona.
+        await _unitOfWork.PersonRoles.RemoveByPersonAsync(id);
         await _unitOfWork.People.DeleteAsync(id);
         await _unitOfWork.SaveChangesAsync(ct);
         return Result<bool>.Success(true);

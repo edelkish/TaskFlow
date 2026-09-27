@@ -1,0 +1,264 @@
+@page "/cargos"
+@inherits TaskFlow.Blazor.Components.AuthenticatedPageBase
+@inject TaskFlow.Blazor.Services.ApiClient Api
+
+<PageTitle>Cargos</PageTitle>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title"><i class="bi bi-briefcase me-2"></i>Cargos</h3>
+                @if (AuthState.CanEditMasterData)
+                {
+                    <button class="btn btn-sm btn-primary" @onclick="() => ShowCreate = true">
+                        <i class="bi bi-plus-lg me-1"></i> Nuevo cargo
+                    </button>
+                }
+            </div>
+            <div class="card-body">
+                <div class="callout callout-info">
+                    <h5><i class="bi bi-info-circle me-1"></i> Para qué sirve</h5>
+                    <p class="mb-0">
+                        La importación TXT exige que cada persona tenga el cargo que el archivo le asigna
+                        (<code>Dev</code>, <code>Team Lead</code> o <code>QA</code>). Si falta, la importación se rechaza
+                        completa. Estos cargos son un maestro curado: solo <code>Admin</code> y <code>Planificación</code> pueden crearlos.
+                    </p>
+                </div>
+
+                @if (IsLoading)
+                {
+                    <LoadingSpinner />
+                }
+                else
+                {
+                    @if (ShowCreate)
+                    {
+                        <div class="card card-outline card-primary mb-3">
+                            <div class="card-body">
+                                <h6 class="mb-3">Nuevo cargo</h6>
+                                <form class="needs-validation" novalidate @ref="_createForm">
+                                    <div class="row g-2">
+                                        <div class="col-md-5">
+                                            <label class="form-label">Nombre</label>
+                                            <input type="text" class="form-control" maxlength="30" required @bind="NewName" />
+                                            <div class="invalid-feedback">El nombre es obligatorio.</div>
+                                            <div class="form-text">Máx. 30 caracteres. Ej.: Dev, Team Lead, QA, Architect.</div>
+                                        </div>
+                                        <div class="col-md-4 d-flex align-items-end">
+                                            <button type="button" class="btn btn-primary btn-sm" disabled="@Busy" @onclick="CreateAsync">
+                                                <i class="bi bi-check-lg me-1"></i> Guardar
+                                            </button>
+                                            <button type="button" class="btn btn-secondary btn-sm ms-1" @onclick="() => ShowCreate = false">Cancelar</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Personas</th>
+                                    <th>Estado</th>
+                                    <th class="text-end">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Roles == null || Roles.Count == 0)
+                                {
+                                    <tr><td colspan="4" class="text-center text-secondary">No hay cargos registrados.</td></tr>
+                                }
+                                else
+                                {
+                                    @foreach (var rol in Roles!)
+                                    {
+                                        <tr>
+                                            <td>
+                                                @if (Edit?.Id == rol.Id)
+                                                {
+                                                    <input type="text" class="form-control form-control-sm d-inline-block w-auto" maxlength="30" @bind="EditName" />
+                                                }
+                                                else
+                                                {
+                                                    @rol.Name
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (rol.PersonCount > 0)
+                                                {
+                                                    <span class="badge text-bg-primary">@rol.PersonCount</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-secondary">0</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (rol.IsActive)
+                                                {
+                                                    <span class="badge text-bg-success">Activo</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge text-bg-secondary">Inactivo</span>
+                                                }
+                                            </td>
+                                            <td class="text-end">
+                                                @if (!AuthState.CanEditMasterData)
+                                                {
+                                                    <span class="text-secondary">—</span>
+                                                }
+                                                else if (Edit?.Id == rol.Id)
+                                                {
+                                                    <button class="btn btn-sm btn-success" @onclick="() => SaveEditAsync(rol)">
+                                                        <i class="bi bi-check-lg"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-secondary ms-1" @onclick="CancelEdit">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ToggleEdit(rol)">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(rol)">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private ElementReference _createForm;
+
+    private List<TaskFlow.Application.DTOs.RoleDto>? Roles { get; set; }
+    private bool ShowCreate { get; set; }
+    private bool Busy { get; set; }
+
+    private string NewName { get; set; } = string.Empty;
+
+    private TaskFlow.Application.DTOs.RoleDto? Edit { get; set; }
+    private string EditName { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        LoadError = null;
+        try
+        {
+            Roles = await Api.GetRolesAsync();
+        }
+        catch (Exception ex)
+        {
+            Roles = new();
+            LoadError = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (!await Toast.ValidateFormAsync(_createForm))
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            await Api.CreateRoleAsync(new TaskFlow.Application.DTOs.CreateRoleDto { Name = NewName.Trim() });
+            ShowCreate = false;
+            NewName = string.Empty;
+            await Toast.SuccessAsync("Cargo creado correctamente.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await Toast.ErrorAsync(ex.Message);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void ToggleEdit(TaskFlow.Application.DTOs.RoleDto rol)
+    {
+        if (Edit?.Id == rol.Id)
+        {
+            CancelEdit();
+            return;
+        }
+
+        Edit = rol;
+        EditName = rol.Name;
+    }
+
+    private void CancelEdit()
+    {
+        Edit = null;
+        EditName = string.Empty;
+    }
+
+    private async Task SaveEditAsync(TaskFlow.Application.DTOs.RoleDto rol)
+    {
+        if (string.IsNullOrWhiteSpace(EditName))
+        {
+            await Toast.ErrorAsync("El nombre del cargo es obligatorio.");
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            await Api.UpdateRoleAsync(rol.Id, new TaskFlow.Application.DTOs.UpdateRoleDto { Name = EditName.Trim() });
+            CancelEdit();
+            await Toast.SuccessAsync("Cargo actualizado correctamente.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await Toast.ErrorAsync(ex.Message);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task DeleteAsync(TaskFlow.Application.DTOs.RoleDto rol)
+    {
+        try
+        {
+            await Api.DeleteRoleAsync(rol.Id);
+            await Toast.SuccessAsync("Cargo eliminado.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await Toast.ErrorAsync(ex.Message);
+        }
+    }
+}

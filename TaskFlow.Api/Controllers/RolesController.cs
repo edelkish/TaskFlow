@@ -9,37 +9,41 @@ namespace TaskFlow.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class PeopleController : ControllerBase
+public class RolesController : ControllerBase
 {
-    private readonly IPersonService _personService;
+    private readonly IRoleService _roleService;
 
-    public PeopleController(IPersonService personService)
+    public RolesController(IRoleService roleService)
     {
-        _personService = personService;
+        _roleService = roleService;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var result = await _personService.GetAllAsync();
+        var result = await _roleService.GetAllAsync();
         return Ok(result.Value);
     }
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var result = await _personService.GetAsync(id);
+        var result = await _roleService.GetAsync(id);
         if (!result.IsSuccess)
             return NotFound(result.Error);
 
         return Ok(result.Value);
     }
 
+    /// <summary>
+    /// El catálogo de cargos es un maestro curado, así que su escritura queda
+    /// restringida a Admin y Planificación (nadie se auto-asigna cargos por la API).
+    /// </summary>
     [HttpPost]
     [Authorize(Policy = AppPolicies.MasterDataWrite)]
-    public async Task<IActionResult> Create([FromBody] CreatePersonDto dto)
+    public async Task<IActionResult> Create([FromBody] CreateRoleDto dto)
     {
-        var result = await _personService.CreateAsync(dto);
+        var result = await _roleService.CreateAsync(dto);
         if (!result.IsSuccess)
             return BadRequest(result.Error);
 
@@ -48,11 +52,15 @@ public class PeopleController : ControllerBase
 
     [HttpPut("{id:guid}")]
     [Authorize(Policy = AppPolicies.MasterDataWrite)]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePersonDto dto)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateRoleDto dto)
     {
-        var result = await _personService.UpdateAsync(id, dto);
+        var result = await _roleService.UpdateAsync(id, dto);
         if (!result.IsSuccess)
-            return NotFound(result.Error);
+        {
+            return result.Error!.Contains("no encontrado", StringComparison.OrdinalIgnoreCase)
+                ? NotFound(result.Error)
+                : BadRequest(result.Error);
+        }
 
         return Ok(result.Value);
     }
@@ -61,26 +69,14 @@ public class PeopleController : ControllerBase
     [Authorize(Policy = AppPolicies.MasterDataWrite)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var result = await _personService.DeleteAsync(id);
-        if (!result.IsSuccess)
-            return NotFound(result.Error);
-
-        return NoContent();
-    }
-
-    /// <summary>Reemplaza el conjunto de cargos de la persona (Dev, Team Lead, QA, u otros).</summary>
-    [HttpPut("{id:guid}/roles")]
-    [Authorize(Policy = AppPolicies.MasterDataWrite)]
-    public async Task<IActionResult> SetRoles(Guid id, [FromBody] SetPersonRolesDto dto)
-    {
-        var result = await _personService.SetRolesAsync(id, dto);
+        var result = await _roleService.DeleteAsync(id);
         if (!result.IsSuccess)
         {
-            return result.Error!.Contains("no encontrada", StringComparison.OrdinalIgnoreCase)
+            return result.Error!.Contains("no encontrado", StringComparison.OrdinalIgnoreCase)
                 ? NotFound(result.Error)
                 : BadRequest(result.Error);
         }
 
-        return Ok(result.Value);
+        return NoContent();
     }
 }

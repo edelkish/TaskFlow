@@ -14,8 +14,9 @@ public static class IdentitySeeder
     public const string DeveloperRole = "Developer";
     public const string TeamLeadRole = "TeamLead";
     public const string QaRole = "QA";
+    public const string PlannerRole = "Planificación";
 
-    private static readonly string[] Roles = { AdminRole, DeveloperRole, TeamLeadRole, QaRole };
+    private static readonly string[] Roles = { AdminRole, DeveloperRole, TeamLeadRole, QaRole, PlannerRole };
 
     public static async Task SeedAsync(RoleManager<IdentityRole> roleManager,
         UserManager<IdentityUser> userManager,
@@ -31,13 +32,15 @@ public static class IdentitySeeder
         }
 
         // Usuario administrador con acceso total (todos los roles).
-        await EnsureUserAsync(userManager, "admin@taskflow.local", "@Admin123/*-+",
-            new[] { AdminRole, DeveloperRole, TeamLeadRole, QaRole });
+        await EnsureUserAsync(userManager, "admin@taskflow.local", "@Admin123/*-+", Roles);
 
         // Un usuario por cada rol operativo.
         await EnsureUserAsync(userManager, "developer@taskflow.local", "@User123/*-+", new[] { DeveloperRole });
         await EnsureUserAsync(userManager, "teamlead@taskflow.local", "@User123/*-+", new[] { TeamLeadRole });
         await EnsureUserAsync(userManager, "qa@taskflow.local", "@User123/*-+", new[] { QaRole });
+
+        // Planificación: es el rol NO importador, pero sí curador de maestros.
+        await EnsureUserAsync(userManager, "planificacion@taskflow.local", "@User123/*-+", new[] { PlannerRole });
 
         // Vinculación de People (nombre exacto) con usuarios Identity registrados.
         var people = await unitOfWork.People.GetAllAsync();
