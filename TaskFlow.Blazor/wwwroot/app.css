@@ -77,3 +77,49 @@ h1:focus {
     right: 0.75rem;
     top: 0.5rem;
 }
+
+.ayuda-toc {
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
+    overflow-y: auto;
+}
+
+.ayuda-toc .nav-link {
+    font-size: 0.875rem;
+    padding: 0.3rem 0.5rem;
+}
+
+.ayuda-anchor {
+    scroll-margin-top: 1rem;
+}
+
+.ayuda-seccion {
+    margin-top: 2.25rem;
+}
+
+.ayuda-seccion > h4 {
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.ayuda-pre {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    margin-bottom: 0;
+    padding: 0.75rem 1rem;
+    background-color: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.375rem;
+}
+
+.ayuda-pre code {
+    color: var(--bs-body-color);
+}
+
+@media (max-width: 991.98px) {
+    .ayuda-toc {
+        position: static;
+        max-height: none;
+    }
+}

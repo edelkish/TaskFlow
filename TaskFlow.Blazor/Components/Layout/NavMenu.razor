@@ -10,12 +10,15 @@
         </NavLink>
     </li>
 
-    <li class="nav-item">
-        <NavLink class="nav-link" href="import">
-            <i class="nav-icon bi bi-box-arrow-down"></i>
-            <p>Importar TXT</p>
-        </NavLink>
-    </li>
+    @if (AuthState.CanImport)
+    {
+        <li class="nav-item">
+            <NavLink class="nav-link" href="import">
+                <i class="nav-icon bi bi-box-arrow-down"></i>
+                <p>Importar TXT</p>
+            </NavLink>
+        </li>
+    }
 
     <li class="nav-item">
         <NavLink class="nav-link" href="periodos">
@@ -39,11 +42,28 @@
     </li>
 
     <li class="nav-item">
+        <NavLink class="nav-link" href="grupos-desarrollo">
+            <i class="nav-icon bi bi-people-fill"></i>
+            <p>Grupos de desarrollo</p>
+        </NavLink>
+    </li>
+
+    <li class="nav-item">
         <NavLink class="nav-link" href="personas">
             <i class="nav-icon bi bi-people"></i>
             <p>Personas</p>
         </NavLink>
     </li>
+
+    @if (AuthState.CanEditMasterData)
+    {
+        <li class="nav-item">
+            <NavLink class="nav-link" href="cargos">
+                <i class="nav-icon bi bi-briefcase"></i>
+                <p>Cargos</p>
+            </NavLink>
+        </li>
+    }
 
     @if (AuthState.IsAdmin)
     {
@@ -56,4 +76,13 @@
             </NavLink>
         </li>
     }
+
+    <li class="nav-header">AYUDA</li>
+
+    <li class="nav-item">
+        <NavLink class="nav-link" href="ayuda">
+            <i class="nav-icon bi bi-life-preserver"></i>
+            <p>Ayuda</p>
+        </NavLink>
+    </li>
 </ul>

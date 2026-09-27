@@ -1,0 +1,862 @@
+@page "/ayuda"
+@inherits TaskFlow.Blazor.Components.AuthenticatedPageBase
+@inject IJSRuntime Js
+
+<PageTitle>Ayuda</PageTitle>
+
+<div class="row">
+    <div class="col-lg-3">
+        <div class="ayuda-toc">
+            <div class="input-group input-group-sm mb-2">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="search" class="form-control" placeholder="Buscar en la ayuda"
+                       aria-label="Buscar en la ayuda" @bind="_consulta" @bind:event="oninput" />
+                @if (_consulta.Length > 0)
+                {
+                    <button class="btn btn-outline-secondary" type="button" title="Limpiar"
+                            @onclick="Limpiar">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                }
+            </div>
+            @if (_consulta.Length > 0)
+            {
+                <p class="small text-secondary">
+                    @(_visibles.Count) de @(_todas.Length) secciones
+                </p>
+            }
+            <nav class="nav flex-column">
+                @foreach (var s in _todas.Where(x => _visibles.Contains(x.Id)))
+                {
+                    if (s.EsGrupo)
+                    {
+                        <a class="nav-link fw-bold text-body pt-2" href="@Ancla(s.Id)"
+                           @onclick="() => IrA(s.Id)" @onclick:preventDefault>@s.Titulo</a>
+                    }
+                    else
+                    {
+                        <a class="nav-link text-secondary ps-3" href="@Ancla(s.Id)"
+                           @onclick="() => IrA(s.Id)" @onclick:preventDefault>@s.Titulo</a>
+                    }
+                }
+            </nav>
+        </div>
+    </div>
+
+    <div class="col-lg-9">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="bi bi-journal-text me-2"></i>Lógica de negocio — Importación de tareas TXT
+                </h3>
+            </div>
+            <div class="card-body">
+                <p class="text-secondary">
+                    Documento de referencia que explica cómo funciona el subsistema de planificación de TaskFlow:
+                    qué valida la importación, qué escribe en la base, qué queda en el backlog y qué puede hacer
+                    cada rol.
+                </p>
+
+                <div class="callout callout-info">
+                    <h5><i class="bi bi-info-circle me-1"></i> Marcadores de estado</h5>
+                    <ul class="mb-2">
+                        <li>✅ comportamiento implementado y verificado</li>
+                        <li>⏳ pendiente de implementar</li>
+                    </ul>
+                    <p class="mb-0">
+                        Todos los pendientes que se habían detectado durante la revisión quedaron implementados el
+                        2026-09-26. El detalle está en la <a href="@Ancla(Parte3)" @onclick="() => IrA(Parte3)"
+                            @onclick:preventDefault>Parte 3</a>.
+                    </p>
+                </div>
+
+                @if (_consulta.Length > 0)
+                {
+                    <div class="callout callout-warning">
+                        <i class="bi bi-funnel me-1"></i> Filtrando por «@_consulta». La búsqueda mira el título y
+                        las palabras clave de cada sección, no el texto completo.
+                    </div>
+                }
+
+                <h2 class="h4 text-uppercase text-secondary mt-4 ayuda-anchor" id="p1">Parte 1 — La lógica de negocio</h2>
+
+                <section class="ayuda-seccion">
+                    <h4 class="h5 ayuda-anchor" id="s1-1">1.1 La regla que gobierna todo</h4>
+                    <pre class="ayuda-pre"><code>La importación NO crea maestros.  Todo o nada.  Un desconocido = archivo rechazado.</code></pre>
+                    <p class="mt-3">
+                        Todo lo demás se deriva de ahí. El importador es un <strong>registrador</strong>, no un
+                        creador: si el archivo dice <code>Dev: Angel</code>, Angel tiene que existir en
+                        <code>Personas</code> con el cargo <code>Dev</code>. Si no, el archivo entero se rechaza.
+                        ¿Por qué? Porque si el importador creara personas al vuelo, un typo en el TXT
+                        (<code>Edelksi</code> en vez de <code>Edelkis</code>) metería un fantasma en el maestro y
+                        ese fantasma se propagaría a los meses siguientes.
+                    </p>
+                </section>
+
+                <section class="ayuda-seccion">
+                    <h4 class="h5 ayuda-anchor" id="s1-2">1.2 Tres conceptos que se confundían ✅</h4>
+                    <p>Este era el problema de fondo del diseño anterior:</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Concepto</th>
+                                    <th>Pregunta que responde</th>
+                                    <th>Dónde vive</th>
+                                    <th>Quién lo define</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Rol Identity</strong></td>
+                                    <td><em>¿Qué puede hacer esta persona en la app?</em></td>
+                                    <td><code>AspNetRoles</code></td>
+                                    <td>Tiende</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Cargo</strong> (<code>Role</code>)</td>
+                                    <td><em>¿Puede actuar como Dev / QA / TL en un TXT?</em></td>
+                                    <td>tabla <code>Roles</code></td>
+                                    <td>Curaduría</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Grupo de desarrollo</strong></td>
+                                    <td><em>¿Quiénes trabajan juntos en este proyecto?</em></td>
+                                    <td><code>DevGroups</code></td>
+                                    <td>Curaduría</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="mt-3">
+                        El <code>enum Role</code> de dominio se usaba para las dos primeras cosas. Ahora están
+                        separadas:
+                    </p>
+                    <ul>
+                        <li>
+                            <code>IdentitySeeder.cs:13-19</code> → roles de app:
+                            <code>Admin</code>, <code>Developer</code>, <code>TeamLead</code>, <code>QA</code>,
+                            <code>Planificación</code>
+                        </li>
+                        <li>
+                            <code>CatalogSeeder.cs</code> → cargos: <code>Dev</code>, <code>Team Lead</code>,
+                            <code>QA</code>, con GUIDs fijos (<code>111…</code>, <code>222…</code>, <code>333…</code>)
+                        </li>
+                        <li>
+                            <code>PersonRole</code> → puente N-a-N: <strong>la misma persona puede tener varios
+                            cargos</strong>, que es el caso de Edelkis en el archivo de ejemplo
+                        </li>
+                    </ul>
+                    <div class="callout callout-warning">
+                        <h5><i class="bi bi-lightbulb me-1"></i> Por qué el backfill importa</h5>
+                        <p class="mb-0">
+                            Los cargos son nuevos. Si no se le asignaran a partir de los <code>TaskGroups</code>
+                            históricos, <strong>todos</strong> los TXT que el equipo ya tiene se rechazarían.
+                            <code>CatalogSeeder</code> recorre los bloques anteriores y le pone a cada persona los
+                            cargos que el archivo le exigía.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="ayuda-seccion">
+                    <h4 class="h5 ayuda-anchor" id="s1-3">1.3 El grupo de desarrollo y por qué hoy solo avisa ✅</h4>
+                    <p>
+                        <code>DevGroup</code> es el equipo estable; <code>DevGroupMember</code> la membresía;
+                        <code>Project.DevGroupId</code> es <strong>opcional</strong> (si borras el grupo, el proyecto
+                        queda sin grupo: <code>ON DELETE SET NULL</code>).
+                    </p>
+                    <p>
+                        Sirve para <strong>una sola cosa por ahora</strong>: detectar cuando el Dev o el QA de un
+                        bloque no es del equipo del proyecto.
+                    </p>
+                    <p>Y es un <strong>warning deliberado</strong>, no un error:</p>
+                    <pre class="ayuda-pre"><code>Bloque 1: 'Angel' (Dev) no pertenece al grupo de desarrollo 'Core' del proyecto.</code></pre>
+                    <p class="mt-3">
+                        Razón: si fuera bloqueante, el día que hay que planificar el mes y el grupo todavía está
+                        desactualizado, <strong>no podrías reportar nada</strong>. Un warning deja trabajar y dice
+                        qué limpiar. La idea es promoverlo a error más adelante, cuando los datos estén depurados.
+                    </p>
+                </section>
+
+                <section class="ayuda-seccion">
+                    <h4 class="h5 ayuda-anchor" id="s1-4">1.4 Período vs. Backlog: una sola tabla ✅</h4>
+                    <p>
+                        Antes había dos entidades para "tarea" y ninguna se usaba. Ahora hay una, y
+                        <strong>la regla que las distingue es <code>TaskGroupId</code></strong>:
+                    </p>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Tarea de <strong>período</strong></th>
+                                    <th>Tarea de <strong>backlog</strong></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Viene del TXT</td>
+                                    <td>Sí</td>
+                                    <td>No (se crea a mano)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>TaskGroupId</code></td>
+                                    <td>apunta al bloque</td>
+                                    <td><code>NULL</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>ProjectId</code></td>
+                                    <td>el del bloque</td>
+                                    <td>el que elige el usuario</td>
+                                </tr>
+                                <tr>
+                                    <td><code>Number</code> / <code>SubNumber</code></td>
+                                    <td><code>1</code>, <code>1.1</code></td>
+                                    <td><code>NULL</code></td>
+                                </tr>
+                                <tr>
+                                    <td><code>Source</code></td>
+                                    <td><code>Import</code></td>
+                                    <td><code>Manual</code></td>
+                                </tr>
+                                <tr>
+                                    <td>Asignación</td>
+                                    <td>restringida al Dev/TL/QA <strong>del grupo</strong></td>
+                                    <td>libre</td>
+                                </tr>
+                                <tr>
+                                    <td>Al borrar el grupo</td>
+                                    <td>se borran en cascada</td>
+                                    <td>no se ven afectadas</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="mt-3">
+                        Las tareas de período son <strong>histórico de un mes</strong>: describen qué se hizo en
+                        agosto. El backlog es <strong>trabajo futuro sin fecha</strong>: vive en el proyecto, no en
+                        un mes.
+                    </p>
+                    <div class="callout callout-info">
+                        <p class="mb-0">
+                            Por qué el KPI "Tareas planificadas" del dashboard antes siempre daba 0: leía
+                            <code>TaskItem</code>, una tabla huérfana que nadie llenaba. Ahora cuenta backlog real.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="ayuda-seccion">
+                    <h4 class="h5 ayuda-anchor" id="s1-5">1.5 Permisos: reportar no es curar ✅</h4>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Acción</th>
+                                    <th class="text-center">Admin</th>
+                                    <th class="text-center">Planificación</th>
+                                    <th class="text-center">TeamLead</th>
+                                    <th class="text-center">QA</th>
+                                    <th class="text-center">Developer</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Ver todo</td>
+                                    <td class="text-center">✅</td>
+                                    <td class="text-center">✅</td>
+                                    <td class="text-center">✅</td>
+                                    <td class="text-center">✅</td>
+                                    <td class="text-center">✅</td>
+                                </tr>
+                                <tr>
+                                    <td>Maestros: Personas, Cargos, Proyectos, Períodos, Grupos, Grupos dev., Backlog</td>
+                                    <td class="text-center">✅</td>
+                                    <td class="text-center">✅</td>
+                                    <td class="text-center">❌</td>
+                                    <td class="text-center">❌</td>
+                                    <td class="text-center">❌</td>
+                                </tr>
+                                <tr>
+                                    <td>Importar TXT</td>
+                                    <td class="text-center">✅</td>
+                                    <td class="text-center">✅</td>
+                                    <td class="text-center">✅</td>
+                                    <td class="text-center">✅</td>
+                                    <td class="text-center">❌</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="mt-3">
+                        La idea: el Developer prepara su trabajo pero <strong>no reporta</strong> (para que no se
+                        altere lo que se le asignó) y <strong>no toca maestros</strong>. Planificación cura maestros
+                        y también puede reportar, aunque no sea Dev ni QA. TeamLead y QA reportan porque son
+                        responsables del trabajo del mes.
+                    </p>
+                </section>
+
+                <section class="ayuda-seccion">
+                    <h4 class="h5 ayuda-anchor" id="s1-6">1.6 El pipeline, etapa por etapa</h4>
+                    <pre class="ayuda-pre"><code>TXT ──► ① PARSER ──► ② VALIDADOR ──► ③ ESCRITURA ──► ④ LOTE
+        lee         decide         transaccional    deja rastro
+        tolera      bloquea        atómica</code></pre>
+                    <p class="mt-3">
+                        <strong>① Parser</strong> — permisivo a propósito. Nunca aborta, nunca descarta. Si una
+                        línea está rara, la anota como <em>finding</em> y sigue, para reportar
+                        <strong>todos</strong> los problemas del archivo de una vez en vez de fallar en el
+                        primero.
+                    </p>
+                    <p><strong>② Validador</strong> — no escribe nada. Decide.</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Bloquean (error)</th>
+                                    <th>Avisan (warning)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>PeriodNotFound</code> — el mes no está creado</td>
+                                    <td><code>PersonNotInDevGroup</code> — Dev/QA fuera del equipo</td>
+                                </tr>
+                                <tr>
+                                    <td><code>ProjectRequired</code> / <code>NotFound</code> / <code>Inactive</code></td>
+                                    <td><code>UnrecognizedLine</code> — línea rara, se importa igual</td>
+                                </tr>
+                                <tr>
+                                    <td><code>PersonNotFound</code> / <code>PersonInactive</code></td>
+                                    <td><code>IgnoredLine</code> — texto suelto</td>
+                                </tr>
+                                <tr>
+                                    <td><code>MissingRole</code> — la persona no tiene el cargo que el archivo le exige</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td><code>BlockWithoutTasks</code> / <code>FileEmpty</code></td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="mt-3">
+                        <strong>③ Escritura</strong> — una transacción. Si algo revienta a la mitad,
+                        <code>ROLLBACK</code> y la base queda como estaba.
+                    </p>
+                    <p>
+                        <strong>④ Lote</strong> — cada intento deja un <code>ImportBatch</code>.
+                        <code>PeriodId</code> es nullable a propósito: el rechazo más común es
+                        <em>"el período no existe"</em>, y con la columna obligatoria ese rechazo no se podría ni
+                        registrar.
+                    </p>
+                </section>
+
+                <h2 class="h4 text-uppercase text-secondary mt-5 ayuda-anchor" id="p2">Parte 2 — Ejemplo práctico con el archivo real</h2>
+                <p>
+                    <code>docs/samples/taskAgosto2026.txt</code>, línea por línea, con lo que el parser entiende:
+                </p>
+                <pre class="ayuda-pre"><code>Agosto 2026                 → Período: mes=8, año=2026
+App: Sitio Web (UI)         → Proyecto (debe existir ya)
+Dev: Angel                  → Persona con cargo Dev
+Team Leade: Edelkis         → Team Lead (el typo "Leade" está permitido)
+QA: Yidsy                   → Persona con cargo QA
+Tasks:                      → empieza la captura del bloque
+1. Configurar entornos      → Number=1, SubNumber=NULL
+   1.1- Crear pipelines...  → Number=1, SubNumber=1
+       - nocturno y por rama→ se ANEXA a la subtarea 1.1 (no crea tarea)
+   1.2- Parametrizar...     → Number=1, SubNumber=2
+2. Maquetación de pantallas → Number=2
+   2.1- Layout base AdminLTE→ Number=2, SubNumber=1
+3. Accesibilidad            → Number=3
+   3.1- Contraste AA...     → Number=3, SubNumber=1</code></pre>
+                <p class="mt-3">Nótese tres cosas del parser que hacen la vida fácil:</p>
+                <ul>
+                    <li><code>Team Leade:</code> sin la <code>r</code> final → se acepta (y también <code>Team Lead:</code>)</li>
+                    <li><code>1.1-</code> con guion o <code>1.1.</code> con punto → ambos</li>
+                    <li>
+                        El bullet <code>- nocturno y por rama</code> <strong>se suma</strong> a la descripción de
+                        1.1, no crea una tarea suelta. Por eso el bloque 1 son 7 tareas y no 8.
+                    </li>
+                </ul>
+
+                <section class="ayuda-seccion">
+                    <h4 class="h5 ayuda-anchor" id="s2-1">2.1 Estado inicial necesario</h4>
+                    <pre class="ayuda-pre"><code>-- Período: lo crea alguien en /periodos, no el importador
+INSERT Periods (Name, Month, Year) VALUES ('Agosto 2026', 8, 2026);
+
+-- Proyectos: deben existir con el nombre EXACTO del App:
+INSERT Projects (Name, ...) VALUES ('Sitio Web (UI)', ...),
+                                ('Sitio Web (API)', ...),
+                                ('Portal de Reportes', ...);
+
+-- Personas + cargos (la misma persona puede tener varios)
+Angel      → Dev
+Elizabeth   → Dev
+Edelkis     → Dev + Team Lead      ← los dos, por eso la tabla puente N-a-N
+Miguel      → Team Lead
+Yidsy       → QA
+
+-- Grupo de desarrollo (opcional)
+DevGroup "Core" = { Angel, Elizabeth, Edelkis, Yidsy }
+Project "Sitio Web (UI)" → DevGroupId = Core</code></pre>
+                </section>
+
+                <section class="ayuda-seccion">
+                    <h4 class="h5 ayuda-anchor" id="s2-2">2.2 El resultado: 4 bloques, 15 tareas</h4>
+                    <p>El parser agrupa así:</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th><code>App:</code></th>
+                                    <th>Dev</th>
+                                    <th>TL</th>
+                                    <th>QA</th>
+                                    <th>Tareas</th>
+                                    <th><code>TaskGroup</code> que se crea</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td>Sitio Web (UI)</td>
+                                    <td>Angel</td>
+                                    <td>Edelkis</td>
+                                    <td>Yidsy</td>
+                                    <td>3 padres + 4 subs = <strong>7</strong></td>
+                                    <td>período 8/2026, proyecto UI, dev=Angel</td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td>Sitio Web (API)</td>
+                                    <td>Elizabeth</td>
+                                    <td>Edelkis</td>
+                                    <td>Yidsy</td>
+                                    <td>2 padres + 3 subs = <strong>5</strong></td>
+                                    <td>período 8/2026, proyecto API, dev=Elizabeth</td>
+                                </tr>
+                                <tr>
+                                    <td>3</td>
+                                    <td>Portal de Reportes</td>
+                                    <td>Edelkis</td>
+                                    <td>Miguel</td>
+                                    <td>Yidsy</td>
+                                    <td>1 padre + 1 sub = <strong>2</strong></td>
+                                    <td>período 8/2026, proyecto Reportes, dev=Edelkis</td>
+                                </tr>
+                                <tr>
+                                    <td>4</td>
+                                    <td><em>(no hay App:)</em></td>
+                                    <td>—</td>
+                                    <td>Edelkis</td>
+                                    <td>Yidsy</td>
+                                    <td><strong>1</strong></td>
+                                    <td><strong>QA-only</strong>: sin proyecto, sin dev</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="mt-3">Y las filas del bloque 1 en <code>PlanningTasks</code>:</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Number</th>
+                                    <th>Sub</th>
+                                    <th>Description</th>
+                                    <th>AssignedPerson</th>
+                                    <th>Project</th>
+                                    <th>Source</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td>—</td>
+                                    <td>Configurar entornos</td>
+                                    <td>Angel</td>
+                                    <td>Sitio Web (UI)</td>
+                                    <td>Import</td>
+                                </tr>
+                                <tr>
+                                    <td>1</td>
+                                    <td>1</td>
+                                    <td>Crear pipelines de build · nocturno y por rama</td>
+                                    <td>Angel</td>
+                                    <td>Sitio Web (UI)</td>
+                                    <td>Import</td>
+                                </tr>
+                                <tr>
+                                    <td>1</td>
+                                    <td>2</td>
+                                    <td>Parametrizar connection strings</td>
+                                    <td>Angel</td>
+                                    <td>Sitio Web (UI)</td>
+                                    <td>Import</td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td>—</td>
+                                    <td>Maquetación de pantallas</td>
+                                    <td>Angel</td>
+                                    <td>Sitio Web (UI)</td>
+                                    <td>Import</td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td>1</td>
+                                    <td>Layout base AdminLTE</td>
+                                    <td>Angel</td>
+                                    <td>Sitio Web (UI)</td>
+                                    <td>Import</td>
+                                </tr>
+                                <tr>
+                                    <td>3</td>
+                                    <td>—</td>
+                                    <td>Accesibilidad</td>
+                                    <td>Angel</td>
+                                    <td>Sitio Web (UI)</td>
+                                    <td>Import</td>
+                                </tr>
+                                <tr>
+                                    <td>3</td>
+                                    <td>1</td>
+                                    <td>Contraste AA en formularios</td>
+                                    <td>Angel</td>
+                                    <td>Sitio Web (UI)</td>
+                                    <td>Import</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="callout callout-info mt-3">
+                        <p class="mb-0">
+                            <strong>La asignación es automática:</strong> el importador no adivina. El archivo dice
+                            quién es el Dev del bloque, y todo lo de ese bloque se le asigna a esa persona. En el
+                            bloque QA-only se asigna al QA.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="ayuda-seccion">
+                    <h4 class="h5 ayuda-anchor" id="s2-3">2.3 Caso A — un Dev que no es del equipo del proyecto ✅</h4>
+                    <p>Si a Elizabeth la sacas del DevGroup "Core":</p>
+                    <pre class="ayuda-pre"><code>{ "severity": "Warning", "code": "PersonNotInDevGroup", "line": 16, "field": "Dev",
+  "message": "Bloque 2: 'Elizabeth' (Dev) no pertenece al grupo de desarrollo 'Core'.",
+  "resolution": "Agregue a 'Elizabeth' al grupo 'Core' en Grupos de Desarrollo." }</code></pre>
+                    <p class="mt-3">
+                        Se puede corregir en <a href="grupos-desarrollo">Grupos de Desarrollo</a>.
+                    </p>
+                    <p>
+                        <code>isValid: true</code> → <strong>se importa igual</strong>, y el warning queda en
+                        pantalla para que veas qué limpiar. El mes se puede reportar.
+                    </p>
+                </section>
+
+                <section class="ayuda-seccion">
+                    <h4 class="h5 ayuda-anchor" id="s2-4">2.4 Caso B — alguien que no existe → 409 y nada cambia</h4>
+                    <p>
+                        Si el archivo dice <code>Team Leade: Migel</code> (typo) y Miguel no está en
+                        <code>Personas</code>:
+                    </p>
+                    <pre class="ayuda-pre"><code>POST /api/import  →  409 Conflict
+
+{
+  "message": "La validación encontró 1 error. No se modificó nada.",
+  "validation": {
+    "isValid": false,
+    "errorsCount": 1,
+    "warningsCount": 0,
+    "blocksCount": 4,
+    "tasksCount": 15,
+    "findings": [{
+      "severity": "Error", "code": "PersonNotFound", "line": 27, "field": "Team Lead",
+      "value": "Migel",
+      "message": "Bloque 3: la persona 'Migel' (Team Lead) no existe.",
+      "resolution": "Cree a 'Migel' en Personas antes de importar."
+    }]
+  }
+}</code></pre>
+                    <p class="mt-3">
+                        Y lo importante: <strong>no se creó nada</strong>. Ni el período, ni los 3 bloques que
+                        estaban perfectos, ni las 14 tareas válidas. Todo o nada.
+                    </p>
+                    <p>
+                        Se puede crear en <a href="personas">Personas</a> y volver a importar.
+                    </p>
+                    <p>Además queda registrado el intento:</p>
+                    <pre class="ayuda-pre"><code>SELECT * FROM ImportBatches
+-- Status: 'Failed', PeriodId: NULL, Note: 'PersonNotFound: Migel (Team Lead)',
+-- TasksCount: 0   ← el registro de que alguien intentó esto y por qué falló</code></pre>
+                    <div class="callout callout-warning mt-3">
+                        <h5><i class="bi bi-bug me-1"></i> Nota de implementación</h5>
+                        <p>
+                            Este registro de auditoría tuvo un defecto: el código asignaba
+                            <code>FilePath = null</code> al lote rechazado, pero la columna
+                            <code>ImportBatches.FilePath</code> es <code>NOT NULL</code>. El INSERT fallaba, el
+                            <code>catch</code> se lo comía en silencio y devolvía <code>null</code>, así que
+                            <code>rejectedBatchId</code> siempre salía <code>null</code> y
+                            <strong>no quedaba rastro de ningún rechazo</strong>. Ya está corregido: la ruta real se
+                            propaga en <code>ImportValidationDto</code> y el lote rechazado sí se escribe.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="ayuda-seccion">
+                    <h4 class="h5 ayuda-anchor" id="s2-5">2.5 Caso C — reimportar el mismo archivo</h4>
+                    <p>
+                        La clave de cada bloque es <strong>(período, proyecto, dev)</strong> — o
+                        <strong>(período, qa)</strong> para el QA-only. Si ya existe, se actualiza; y solo se borran
+                        las tareas con <code>Source = Import</code>:
+                    </p>
+                    <pre class="ayuda-pre"><code>{ "periodName": "Agosto 2026",
+  "groupsCreated": 0, "groupsUpdated": 4,
+  "tasksImported": 15, "tasksRemoved": 15 }</code></pre>
+                    <p class="mt-3">
+                        <strong>Las tareas manuales se conservan.</strong> Si un Dev cargó a mano "Documentar API"
+                        dentro del bloque 2, esa tarea sobrevive a la reimportación; las 5 importadas se reescriben.
+                    </p>
+                </section>
+
+                <section class="ayuda-seccion">
+                    <h4 class="h5 ayuda-anchor" id="s2-6">2.6 Caso D — crear un backlog</h4>
+                    <p>Después, el backlog del proyecto, que <strong>no tiene período ni número</strong>:</p>
+                    <pre class="ayuda-pre"><code>POST /api/planningtasks
+{ "projectId": "&lt;Sitio Web (API)&gt;", "description": "Migrar a .NET 10",
+  "assignedPersonId": "&lt;Elizabeth&gt;", "source": "Manual" }
+→ 201 { "number": null, "subNumber": null, "isBacklog": true }</code></pre>
+                    <p class="mt-3">Y el filtro:</p>
+                    <pre class="ayuda-pre"><code>GET /api/planningtasks/backlog?projectId=&lt;Sitio Web (API)&gt;&amp;assigneeId=&lt;Elizabeth&gt;</code></pre>
+                    <p class="mt-3">
+                        Sale en la pestaña <strong>Backlog</strong> de <a href="tareas">Tareas</a>, y el KPI del
+                        dashboard ya cuenta.
+                    </p>
+                </section>
+
+                <section class="ayuda-seccion">
+                    <h4 class="h5 ayuda-anchor" id="s2-7">2.7 Los endpoints</h4>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Método</th>
+                                    <th>Ruta</th>
+                                    <th>Quién</th>
+                                    <th>Qué hace</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>POST</td>
+                                    <td><code>/api/import/validate</code></td>
+                                    <td>importador</td>
+                                    <td>Dry-run. <strong>200 siempre</strong> — el resultado <em>es</em> la respuesta</td>
+                                </tr>
+                                <tr>
+                                    <td>POST</td>
+                                    <td><code>/api/import</code></td>
+                                    <td>importador</td>
+                                    <td>Importa, o <strong>409</strong> con el detalle si hay errores</td>
+                                </tr>
+                                <tr>
+                                    <td>GET</td>
+                                    <td><code>/api/import</code></td>
+                                    <td>cualquiera</td>
+                                    <td>Historial de lotes</td>
+                                </tr>
+                                <tr>
+                                    <td>GET</td>
+                                    <td><code>/api/planningtasks/backlog</code></td>
+                                    <td>cualquiera</td>
+                                    <td>Backlog, filtros por proyecto/asignado</td>
+                                </tr>
+                                <tr>
+                                    <td>GET/POST/PUT/DELETE</td>
+                                    <td><code>/api/planningtasks</code></td>
+                                    <td>lectura todos · escritura Admin+Planif</td>
+                                    <td>Tareas de período y backlog</td>
+                                </tr>
+                                <tr>
+                                    <td>GET/POST/PUT/DELETE</td>
+                                    <td><code>/api/devgroups</code></td>
+                                    <td>lectura todos · escritura Admin+Planif</td>
+                                    <td>Grupos de desarrollo</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="callout callout-info mt-3">
+                        <p class="mb-0">
+                            Dry-run devuelve 200 incluso con errores a propósito: que el archivo tenga errores no es
+                            un fallo de la llamada, es el contenido de la respuesta. Por eso el <code>409</code>
+                            está solo en la importación real.
+                        </p>
+                    </div>
+                </section>
+
+                <h2 class="h4 text-uppercase text-secondary mt-5 ayuda-anchor" id="p3">Parte 3 — Estado de los pendientes</h2>
+                <p>
+                    Los cinco puntos de esta lista estaban planteados cuando se escribió el documento.
+                    <strong>Los cinco quedaron implementados</strong> el 2026-09-26.
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Cambio</th>
+                                <th>Por qué</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td><code>PlanningTask.ProjectId</code> → nullable, y <code>ProjectRequired</code> solo cuando el bloque no es QA-only</td>
+                                <td>El bloque 4 del archivo de ejemplo (QA-only, sin <code>App:</code>) se rechazaba, pero es un caso que el equipo usa y que el resto del sistema ya contemplaba</td>
+                                <td>✅ Hecho. Migración <code>MakePlanningTaskProjectOptional</code> (solo un <code>ALTER COLUMN</code> a nullable; los índices únicos no se tocan)</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>Propagar la ruta real al lote rechazado</td>
+                                <td><code>FilePath = null</code> contra una columna <code>NOT NULL</code> hacía fallar el INSERT; el <code>catch</code> lo silenciaba y los rechazos nunca se registraban</td>
+                                <td>✅ Hecho. <code>FilePath</code> agregado a <code>ImportValidationDto</code></td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>Clave de respaldo <code>(período, proyecto, qa)</code> para bloques con <code>App:</code> y sin <code>Dev:</code></td>
+                                <td>Ese tipo de bloque <strong>se duplicaba en cada reimportación</strong>: la búsqueda usaba la clave QA-only, que exige <code>ProjectId == NULL</code>, y el grupo sí tiene proyecto</td>
+                                <td>✅ Hecho. <code>GetByQaWithProjectBlockKeyAsync</code></td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td><code>Status = Partial</code> cuando hay warnings del <strong>validador</strong></td>
+                                <td>Se miraba <code>parsed.Findings</code> (del parser) en vez de los findings de la validación, así que un <code>PersonNotInDevGroup</code> dejaba el lote en <code>Success</code> con <code>WarningsCount = 0</code></td>
+                                <td>✅ Hecho. Ahora cuenta parser + validador</td>
+                            </tr>
+                            <tr>
+                                <td>5</td>
+                                <td><code>href="proyectos"</code> → <code>/dashboard</code>; gating visual en <code>/dashboard</code>, <code>/periodos</code>, <code>/grupos</code></td>
+                                <td>Enlace muerto; la API ya daba 403 pero los botones seguían visibles</td>
+                                <td>✅ Hecho con <code>AuthState.CanEditMasterData</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <section class="ayuda-seccion">
+                    <h4 class="h5 ayuda-anchor" id="s3-1">Lo que sigue pendiente</h4>
+                    <ul>
+                        <li>
+                            <strong>No hay proyecto de tests.</strong> Toda la validación estricta está verificada
+                            solo a mano contra <code>docs/samples/taskAgosto2026.txt</code>. Es el punto donde un
+                            falso negativo importa de verdad.
+                        </li>
+                        <li>
+                            <strong>Faltan datos de curación.</strong> La base tiene 0 personas, 0 períodos y 0 task
+                            groups, así que cualquier TXT real se rechaza con <code>PersonNotFound</code> /
+                            <code>PeriodNotFound</code> hasta cargar las personas con sus cargos y crear los
+                            períodos. Es el orden correcto, pero hay que saberlo antes de probar.
+                        </li>
+                        <li>
+                            <strong>Historial de lotes desalineado.</strong> Al reimportar,
+                            <code>TaskGroup.ImportBatchId</code> se reasigna al lote nuevo, así que la asociación
+                            histórica del lote anterior queda desalineada. No afecta la idempotencia de los grupos,
+                            solo el reporte de qué lote creó cada grupo.
+                        </li>
+                        <li>
+                            <strong>Paquetes.</strong> <code>AutoMapper 12.0.1</code> con <code>NU1903</code>
+                            (vulnerabilidad de severidad alta) y <code>System.Text.Encoding.CodePages</code> con
+                            <code>NU1510</code> (innecesario para el TFM actual).
+                        </li>
+                    </ul>
+                    <div class="callout callout-light">
+                        <p class="mb-0">
+                            Ver también <code>Plan-Validacion-Estricta-TXT.md</code> §7, que tiene el detalle de
+                            las cinco fases y el historial de desviaciones.
+                        </p>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private sealed record Seccion(string Id, string Titulo, bool EsGrupo, string[] Palabras);
+
+    private const string Parte3 = "p3";
+
+    private static readonly Seccion[] _todas =
+    [
+        new("p1", "Parte 1 — La lógica de negocio", true, ["logica", "negocio", "resumen", "reglas"]),
+        new("s1-1", "1.1 La regla que gobierna todo", false, ["maestros", "todo o nada", "rechazo", "rechazado", "registrador", "typo", "fantasma"]),
+        new("s1-2", "1.2 Tres conceptos que se confundían ✅", false, ["conceptos", "roles", "cargo", "identity", "seeder", "personrole", "backfill", "curaduria"]),
+        new("s1-3", "1.3 El grupo de desarrollo y por qué hoy solo avisa ✅", false, ["devgroup", "grupo de desarrollo", "warning", "personnotinde vgroup", "set null", "equipo"]),
+        new("s1-4", "1.4 Período vs. Backlog: una sola tabla ✅", false, ["periodo", "backlog", "taskgroupid", "manual", "import", "kpi", "taskitem", "historico"]),
+        new("s1-5", "1.5 Permisos: reportar no es curar ✅", false, ["permisos", "roles", "administrador", "planificacion", "teamlead", "developer", "maestros"]),
+        new("s1-6", "1.6 El pipeline, etapa por etapa", false, ["pipeline", "parser", "validador", "escritura", "lote", "error", "warning", "finding", "importbatch", "rollback", "transaccion"]),
+        new("p2", "Parte 2 — Ejemplo práctico", true, ["ejemplo", "practico", "archivo", "muestra", "casos"]),
+        new("s2-1", "2.1 Estado inicial necesario", false, ["estado inicial", "sql", "periodos", "proyectos", "personas", "cargos", "devgroup", "core", "seed"]),
+        new("s2-2", "2.2 El resultado: 4 bloques, 15 tareas", false, ["resultado", "bloques", "tareas", "planningtasks", "qa-only", "padres", "subs", "asignacion"]),
+        new("s2-3", "2.3 Caso A — Dev fuera del equipo ✅", false, ["caso a", "warning", "personnotinde vgroup", "elizabeth", "se importa", "partial"]),
+        new("s2-4", "2.4 Caso B — 409 y nada cambia", false, ["caso b", "409", "conflict", "personnotfound", "no se creo nada", "filepath", "auditoria", "importbatches", "rollback", "migel"]),
+        new("s2-5", "2.5 Caso C — reimportar el mismo archivo", false, ["caso c", "reimportar", "idempotencia", "groupsupdated", "tasksremoved", "manual", "tasksimported"]),
+        new("s2-6", "2.6 Caso D — crear un backlog", false, ["caso d", "backlog", "crear", "planningtasks", "migrar", "planningtasks/backlog", "filtro"]),
+        new("s2-7", "2.7 Los endpoints", false, ["endpoints", "api", "dry-run", "validate", "200", "rest", "rutas", "planningtasks", "devgroups"]),
+        new("p3", "Parte 3 — Estado de los pendientes", true, ["pendientes", "estado", "implementado", "migracion"]),
+        new("s3-1", "Lo que sigue pendiente", false, ["pendiente", "tests", "curacion", "datos", "paquetes", "automapper", "nu1903", "nu1510", "historial", "lotes", "desalineado"]),
+    ];
+
+    private string _consulta = string.Empty;
+
+    private HashSet<string> _visibles => string.IsNullOrEmpty(_consulta)
+        ? [.. _todas.Select(s => s.Id)]
+        :
+        [
+            .. _todas
+                .Where(s => Tokens(_consulta).All(t => Coincide(s, t)))
+                .Select(s => s.Id)
+        ];
+
+    private void Limpiar() => _consulta = string.Empty;
+
+    /// <summary>
+    /// El scroll lo hace taskflow.ayuda.scrollTo. El href queda como ancla real para
+    /// que el enlace se pueda compartir, pero se cancela el evento: con base href="/"
+    /// Blazor resolveria "#id" contra la raiz, el router matchearia "/" y llevaria a Login.
+    /// </summary>
+    private async Task IrA(string id) => await Js.InvokeVoidAsync("taskflow.ayuda.scrollTo", id);
+
+    private static string[] Tokens(string consulta) => Normalizar(consulta)
+        .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+    private static bool Coincide(Seccion s, string token)
+    {
+        var titulo = Normalizar(s.Titulo);
+        if (titulo.Contains(token))
+        {
+            return true;
+        }
+
+        foreach (var palabra in s.Palabras)
+        {
+            var normalizada = Normalizar(palabra);
+            if (token.Length == 1 ? normalizada == token : normalizada.Contains(token))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string Normalizar(string texto) => texto
+        .ToLowerInvariant()
+        .Replace("á", "a").Replace("é", "e").Replace("í", "i")
+        .Replace("ó", "o").Replace("ú", "u").Replace("ü", "u")
+        .Replace("ñ", "n");
+
+    private static string Ancla(string id) => $"#{id}";
+}
