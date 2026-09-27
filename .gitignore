@@ -22,3 +22,7 @@ debug/
 .idea/
 *.swp
 *.sln.ide
+
+## Configuracion local de agentes
+.claude/
+opencode.json
