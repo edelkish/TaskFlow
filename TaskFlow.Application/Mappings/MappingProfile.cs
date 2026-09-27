@@ -8,24 +8,27 @@ public class MappingProfile : Profile
 {
     public MappingProfile()
     {
+        // TaskCount y DevGroupName se resuelven en ProjectService.MapAsync: requieren
+        // consultas aparte (backlog del proyecto y nombre del grupo).
         CreateMap<Project, ProjectDto>()
-            .ForMember(dest => dest.TaskCount, opt => opt.MapFrom(src => src.Tasks.Count));
+            .ForMember(dest => dest.TaskCount, opt => opt.Ignore())
+            .ForMember(dest => dest.DevGroupName, opt => opt.Ignore());
 
         CreateMap<CreateProjectDto, Project>();
         CreateMap<UpdateProjectDto, Project>();
 
-        CreateMap<TaskItem, TaskDto>()
-            .ForMember(dest => dest.ProjectName, opt => opt.MapFrom(src => src.Project.Name));
-
-        CreateMap<CreateTaskDto, TaskItem>();
-        CreateMap<UpdateTaskDto, TaskItem>();
-
         CreateMap<Period, PeriodDto>();
 
-        CreateMap<Person, PersonDto>();
+        CreateMap<Person, PersonDto>()
+            .ForMember(dest => dest.Roles, opt => opt.Ignore())
+            .ForMember(dest => dest.RoleIds, opt => opt.Ignore());
 
+        CreateMap<Role, RoleDto>();
+
+        // El periodo puede ser null en un lote Failed (por ejemplo, rejections por
+        // periodo inexistente), así que el nombre se resuelve con seguridad.
         CreateMap<ImportBatch, ImportBatchDto>()
-            .ForMember(dest => dest.PeriodName, opt => opt.MapFrom(src => src.Period.Name))
+            .ForMember(dest => dest.PeriodName, opt => opt.MapFrom(src => src.Period != null ? src.Period.Name : "(sin periodo)"))
             .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()));
 
         CreateMap<TaskGroup, TaskGroupDto>()

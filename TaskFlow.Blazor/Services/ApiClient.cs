@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using TaskFlow.Application.DTOs;
@@ -78,38 +79,39 @@ public class ApiClient
         response = await EnsureSuccessAsync(response);
     }
 
-    // Tasks
-    public async Task<List<TaskDto>?> GetTasksByProjectAsync(Guid projectId)
-    {
-        return await _httpClient.GetFromJsonAsync<List<TaskDto>>($"api/tasks/project/{projectId}", _jsonOptions);
-    }
-
-    public async Task<TaskDto?> CreateTaskAsync(CreateTaskDto dto)
-    {
-        var response = await _httpClient.PostAsJsonAsync("api/tasks", dto);
-        response = await EnsureSuccessAsync(response);
-        return await response.Content.ReadFromJsonAsync<TaskDto>(_jsonOptions);
-    }
-
-    public async Task<TaskDto?> UpdateTaskAsync(Guid id, UpdateTaskDto dto)
-    {
-        var response = await _httpClient.PutAsJsonAsync($"api/tasks/{id}", dto);
-        response = await EnsureSuccessAsync(response);
-        return await response.Content.ReadFromJsonAsync<TaskDto>(_jsonOptions);
-    }
-
-    public async Task DeleteTaskAsync(Guid id)
-    {
-        var response = await _httpClient.DeleteAsync($"api/tasks/{id}");
-        response = await EnsureSuccessAsync(response);
-    }
-
     // Importación
     public async Task<ImportResultDto?> ImportFileAsync(string filePath)
     {
         var response = await _httpClient.PostAsJsonAsync("api/import", new { filePath });
         response = await EnsureSuccessAsync(response);
         return await response.Content.ReadFromJsonAsync<ImportResultDto>(_jsonOptions);
+    }
+
+    /// <summary>
+    /// Previsualización en seco. Devuelve 200 con el detalle incluso si el archivo es
+    /// inválido, porque el resultado de la validación es la respuesta esperada.
+    /// </summary>
+    public async Task<ImportValidationDto?> ValidateImportFileAsync(string filePath)
+    {
+        var response = await _httpClient.PostAsJsonAsync("api/import/validate", new { filePath });
+        response = await EnsureSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<ImportValidationDto>(_jsonOptions);
+    }
+
+    /// <summary>Intenta importar y captura el rechazo estructurado si el archivo no es válido.</summary>
+    public async Task<ImportAttemptDto> TryImportFileAsync(string filePath)
+    {
+        var response = await _httpClient.PostAsJsonAsync("api/import", new { filePath });
+
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            var rejection = await response.Content.ReadFromJsonAsync<ImportRejectionDto>(_jsonOptions);
+            return new ImportAttemptDto { Rejection = rejection };
+        }
+
+        response = await EnsureSuccessAsync(response);
+        var result = await response.Content.ReadFromJsonAsync<ImportResultDto>(_jsonOptions);
+        return new ImportAttemptDto { Result = result };
     }
 
     public async Task<List<ImportBatchDto>?> GetImportBatchesAsync()
@@ -207,6 +209,19 @@ public class ApiClient
         response = await EnsureSuccessAsync(response);
     }
 
+    // Backlog: tareas sin grupo (PlanningTask.TaskGroupId == null)
+    public async Task<List<PlanningTaskDto>?> GetBacklogAsync(Guid? projectId = null, Guid? assigneeId = null)
+    {
+        var query = new List<string>();
+        if (projectId.HasValue) query.Add($"projectId={projectId.Value}");
+        if (assigneeId.HasValue) query.Add($"assigneeId={assigneeId.Value}");
+
+        var url = "api/planningtasks/backlog";
+        if (query.Count > 0) url += "?" + string.Join("&", query);
+
+        return await _httpClient.GetFromJsonAsync<List<PlanningTaskDto>>(url, _jsonOptions);
+    }
+
     // Personas
     public async Task<List<PersonDto>?> GetPeopleAsync()
     {
@@ -230,6 +245,77 @@ public class ApiClient
     public async Task DeletePersonAsync(Guid id)
     {
         var response = await _httpClient.DeleteAsync($"api/people/{id}");
+        response = await EnsureSuccessAsync(response);
+    }
+
+    public async Task<PersonDto?> SetPersonRolesAsync(Guid id, SetPersonRolesDto dto)
+    {
+        var response = await _httpClient.PutAsJsonAsync($"api/people/{id}/roles", dto);
+        response = await EnsureSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<PersonDto>(_jsonOptions);
+    }
+
+    // Cargos
+    public async Task<List<RoleDto>?> GetRolesAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<List<RoleDto>>("api/roles", _jsonOptions);
+    }
+
+    public async Task<RoleDto?> CreateRoleAsync(CreateRoleDto dto)
+    {
+        var response = await _httpClient.PostAsJsonAsync("api/roles", dto);
+        response = await EnsureSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<RoleDto>(_jsonOptions);
+    }
+
+    public async Task<RoleDto?> UpdateRoleAsync(Guid id, UpdateRoleDto dto)
+    {
+        var response = await _httpClient.PutAsJsonAsync($"api/roles/{id}", dto);
+        response = await EnsureSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<RoleDto>(_jsonOptions);
+    }
+
+    public async Task DeleteRoleAsync(Guid id)
+    {
+        var response = await _httpClient.DeleteAsync($"api/roles/{id}");
+        response = await EnsureSuccessAsync(response);
+    }
+
+    // Grupos de desarrollo
+    public async Task<List<DevGroupDto>?> GetDevGroupsAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<List<DevGroupDto>>("api/devgroups", _jsonOptions);
+    }
+
+    public async Task<DevGroupDto?> GetDevGroupAsync(Guid id)
+    {
+        return await _httpClient.GetFromJsonAsync<DevGroupDto>($"api/devgroups/{id}", _jsonOptions);
+    }
+
+    public async Task<DevGroupDto?> CreateDevGroupAsync(CreateDevGroupDto dto)
+    {
+        var response = await _httpClient.PostAsJsonAsync("api/devgroups", dto);
+        response = await EnsureSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<DevGroupDto>(_jsonOptions);
+    }
+
+    public async Task<DevGroupDto?> UpdateDevGroupAsync(Guid id, UpdateDevGroupDto dto)
+    {
+        var response = await _httpClient.PutAsJsonAsync($"api/devgroups/{id}", dto);
+        response = await EnsureSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<DevGroupDto>(_jsonOptions);
+    }
+
+    public async Task<DevGroupDto?> SetDevGroupMembersAsync(Guid id, List<Guid> personIds)
+    {
+        var response = await _httpClient.PutAsJsonAsync($"api/devgroups/{id}/members", new SetDevGroupMembersDto { PersonIds = personIds });
+        response = await EnsureSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<DevGroupDto>(_jsonOptions);
+    }
+
+    public async Task DeleteDevGroupAsync(Guid id)
+    {
+        var response = await _httpClient.DeleteAsync($"api/devgroups/{id}");
         response = await EnsureSuccessAsync(response);
     }
 

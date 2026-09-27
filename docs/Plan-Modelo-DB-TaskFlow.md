@@ -2,13 +2,13 @@
 
 ## 1. Contexto y objetivo
 
-TaskFlow (Blazor WebAssembly .NET 10 + API .NET 10) gestiona tareas asociadas a proyectos para grupos de desarrollo (desarrolladores, jefes de proyecto y QA). Las tareas se cargan siempre desde un archivo TXT (ej. `D:\PT 2026\taskAgosto2026.txt`), y además se podrán administrar manualmente con CRUD.
+TaskFlow (Blazor WebAssembly .NET 10 + API .NET 10) gestiona tareas asociadas a proyectos para grupos de desarrollo (desarrolladores, jefes de proyecto y QA). Las tareas se cargan siempre desde un archivo TXT (ej. `docs/samples/taskAgosto2026.txt`, ver `docs/samples/README.md`), y además se podrán administrar manualmente con CRUD.
 
 Este plan define el modelo de datos **SQL Server 2022** en el servidor `ATISSGG07\SQLServer2022`, base de datos `TaskFlowDb`, bajo **Arquitectura Limpia** y principios **SOLID**, con la plantilla de UI **AdminLTE** (`D:\wamp64\www\AdminLTE`, página base `starter.html`) y la metodología **BMAD**.
 
 ## 2. Análisis de la estructura TXT
 
-Formato observado en `D:\PT 2026\taskAgosto2026.txt`:
+Formato observado en `docs/samples/taskAgosto2026.txt` (ejemplo de referencia en el repo):
 
 ```
 Agosto 2026                     ← Periodo (Mes + Año), primera línea
@@ -31,7 +31,7 @@ Tasks:
 - **Jerarquía de tareas**: las tareas empiezan siempre con número (`N.`). Las subtareas llevan subnúmero (`N.M-`). Los bullets `-` sin número continúan la descripción de la tarea o subtarea previa.
 - **Personas repetidas**: la misma persona puede tener varios roles (Edelkis es Dev y TeamLead) → normalización en tabla `People`.
 - **Misma App repetida**: `Sitio Web ... (UI)` aparece con Dev Angel y con Dev Edelkis → un `Project` reutilizado, dos `TaskGroups`.
-- **Encoding**: el archivo parece Windows-1252 (mojibake `�` al leer como UTF-8) → el parser debe detectar la codificación (BOM → UTF-8 estricta → fallback cp1252).
+- **Encoding**: el archivo parece Windows-1252 (mojibake tipo `AÃ±` al leer como UTF-8) → el parser debe detectar la codificación (BOM → UTF-8 estricta → fallback cp1252).
 
 ## 3. Modelo de Base de Datos (SQL Server 2022 — `TaskFlowDb`)
 
@@ -195,7 +195,7 @@ Orden de lectura: `ORDER BY Number, SubNumber` (NULL primero vía `COALESCE`).
 2. **Migraciones**: reemplazar `EnsureCreatedAsync()` por `database.MigrateAsync()`.
 3. **Generar**: `dotnet ef migrations add InitialTaskFlow -p TaskFlow.Infrastructure -s TaskFlow.Api`
 4. **Aplicar**: `dotnet ef database update -p TaskFlow.Infrastructure -s TaskFlow.Api` (crea la BD si no existe; `sa` tiene permiso).
-5. **Validación E2E**: importar `D:\PT 2026\taskAgosto2026.txt` y comprobar: 4 bloques Dev + 1 bloque QA, jerarquías de tareas (ej. tarea 1 con subtareas en bloques UI/API), personas únicas (Edelkis 1 persona, 2+ grupos), re-importación idempotente, CRUD y auth por rol.
+5. **Validación E2E**: importar `docs/samples/taskAgosto2026.txt` (indicando su ruta absoluta en el servidor) y comprobar: 4 bloques Dev + 1 bloque QA, jerarquías de tareas (ej. tarea 1 con subtareas en bloques UI/API), personas únicas (Edelkis 1 persona, 2+ grupos), re-importación idempotente, CRUD y auth por rol.
 
 ## 9. Supuestos/confirmaciones
 

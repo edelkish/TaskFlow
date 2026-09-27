@@ -11,9 +11,12 @@ public class TaskFlowDbContext : IdentityDbContext
     }
 
     public DbSet<Project> Projects => Set<Project>();
-    public DbSet<TaskItem> Tasks => Set<TaskItem>();
     public DbSet<Period> Periods => Set<Period>();
     public DbSet<Person> People => Set<Person>();
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<PersonRole> PersonRoles => Set<PersonRole>();
+    public DbSet<DevGroup> DevGroups => Set<DevGroup>();
+    public DbSet<DevGroupMember> DevGroupMembers => Set<DevGroupMember>();
     public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
     public DbSet<TaskGroup> TaskGroups => Set<TaskGroup>();
     public DbSet<PlanningTask> PlanningTasks => Set<PlanningTask>();

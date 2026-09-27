@@ -26,17 +26,17 @@ public class TaskGroupConfiguration : IEntityTypeConfiguration<TaskGroup>
             .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(g => g.DevPerson)
-            .WithMany(p => p.DevGroups)
+            .WithMany(p => p.PeriodGroupsAsDev)
             .HasForeignKey(g => g.DevPersonId)
             .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(g => g.TeamLeadPerson)
-            .WithMany(p => p.LeadGroups)
+            .WithMany(p => p.PeriodGroupsAsTeamLead)
             .HasForeignKey(g => g.TeamLeadPersonId)
             .OnDelete(DeleteBehavior.NoAction);
 
         builder.HasOne(g => g.QaPerson)
-            .WithMany(p => p.QaGroups)
+            .WithMany(p => p.PeriodGroupsAsQa)
             .HasForeignKey(g => g.QaPersonId)
             .OnDelete(DeleteBehavior.NoAction);
 

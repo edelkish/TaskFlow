@@ -6,18 +6,27 @@ public class CreatePlanningTaskValidator : AbstractValidator<DTOs.CreatePlanning
 {
     public CreatePlanningTaskValidator()
     {
+        // Una tarea cuelga de un grupo (período) o de un proyecto (backlog), nunca de ambos
+        // ni de ninguno. El servicio resuelve el proyecto final en cada caso.
+        RuleFor(x => x)
+            .Must(x => x.TaskGroupId.HasValue || x.ProjectId.HasValue)
+            .WithMessage("Indique un grupo (tarea de período) o un proyecto (tarea de backlog).");
+
         RuleFor(x => x.TaskGroupId)
-            .NotEmpty().WithMessage("El grupo de tareas es obligatorio.");
+            .NotEmpty().WithMessage("El grupo de tareas es obligatorio.")
+            .When(x => !x.ProjectId.HasValue);
 
         RuleFor(x => x.Number)
-            .GreaterThanOrEqualTo(1).WithMessage("El número de tarea debe ser mayor o igual a 1.");
+            .NotEmpty().WithMessage("El número de tarea es obligatorio para tareas de período.")
+            .When(x => x.TaskGroupId.HasValue);
+
+        RuleFor(x => x.Number)
+            .GreaterThanOrEqualTo(1).WithMessage("El número de tarea debe ser mayor o igual a 1.")
+            .When(x => x.Number.HasValue);
 
         RuleFor(x => x.SubNumber)
             .GreaterThanOrEqualTo(1).When(x => x.SubNumber.HasValue)
             .WithMessage("El subnúmero debe ser mayor o igual a 1.");
-
-        RuleFor(x => x.SubNumber)
-            .Null().When(x => x.Number < 1);
 
         RuleFor(x => x.Description)
             .NotEmpty().WithMessage("La descripción es obligatoria.")
@@ -30,7 +39,8 @@ public class UpdatePlanningTaskValidator : AbstractValidator<DTOs.UpdatePlanning
     public UpdatePlanningTaskValidator()
     {
         RuleFor(x => x.Number)
-            .GreaterThanOrEqualTo(1).WithMessage("El número de tarea debe ser mayor o igual a 1.");
+            .GreaterThanOrEqualTo(1).When(x => x.Number.HasValue)
+            .WithMessage("El número de tarea debe ser mayor o igual a 1.");
 
         RuleFor(x => x.SubNumber)
             .GreaterThanOrEqualTo(1).When(x => x.SubNumber.HasValue)

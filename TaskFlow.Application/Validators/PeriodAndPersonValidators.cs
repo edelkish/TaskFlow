@@ -24,7 +24,7 @@ public class CreatePersonValidator : AbstractValidator<DTOs.CreatePersonDto>
     {
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("El nombre es obligatorio.")
-            .MaximumLength(200).WithMessage("El nombre no debe exceder los 200 caracteres.");
+            .MaximumLength(120).WithMessage("El nombre no debe exceder los 120 caracteres.");
 
         RuleFor(x => x.UserId)
             .MaximumLength(450).WithMessage("El identificador de usuario no debe exceder los 450 caracteres.");
@@ -37,7 +37,7 @@ public class UpdatePersonValidator : AbstractValidator<DTOs.UpdatePersonDto>
     {
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("El nombre es obligatorio.")
-            .MaximumLength(200).WithMessage("El nombre no debe exceder los 200 caracteres.");
+            .MaximumLength(120).WithMessage("El nombre no debe exceder los 120 caracteres.");
 
         RuleFor(x => x.UserId)
             .MaximumLength(450).WithMessage("El identificador de usuario no debe exceder los 450 caracteres.");

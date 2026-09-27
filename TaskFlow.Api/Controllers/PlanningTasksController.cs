@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TaskFlow.Api.Authorization;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 
@@ -24,6 +25,17 @@ public class PlanningTasksController : ControllerBase
         return Ok(result.Value);
     }
 
+    /// <summary>
+    /// Backlog: tareas sin grupo (TaskGroupId NULL). Los filtros son opcionales y se
+    /// combinan, por eso no hay ruta por defecto que los pise.
+    /// </summary>
+    [HttpGet("backlog")]
+    public async Task<IActionResult> GetBacklog([FromQuery] Guid? projectId, [FromQuery] Guid? assigneeId)
+    {
+        var result = await _planningTaskService.GetBacklogAsync(projectId, assigneeId);
+        return Ok(result.Value);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
@@ -35,6 +47,7 @@ public class PlanningTasksController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AppPolicies.MasterDataWrite)]
     public async Task<IActionResult> Create([FromBody] CreatePlanningTaskDto dto)
     {
         var result = await _planningTaskService.CreateAsync(dto);
@@ -45,6 +58,7 @@ public class PlanningTasksController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AppPolicies.MasterDataWrite)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePlanningTaskDto dto)
     {
         var result = await _planningTaskService.UpdateAsync(id, dto);
@@ -55,6 +69,7 @@ public class PlanningTasksController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/assign/{personId:guid?}")]
+    [Authorize(Policy = AppPolicies.MasterDataWrite)]
     public async Task<IActionResult> Reassign(Guid id, Guid? personId)
     {
         var result = await _planningTaskService.ReassignAsync(id, personId);
@@ -65,6 +80,7 @@ public class PlanningTasksController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AppPolicies.MasterDataWrite)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var result = await _planningTaskService.DeleteAsync(id);

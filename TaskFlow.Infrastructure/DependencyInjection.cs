@@ -35,9 +35,12 @@ public static class DependencyInjection
 
         // Repositories
         services.AddScoped<IProjectRepository, ProjectRepository>();
-        services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<IPeriodRepository, PeriodRepository>();
         services.AddScoped<IPersonRepository, PersonRepository>();
+        services.AddScoped<IRoleRepository, RoleRepository>();
+        services.AddScoped<IPersonRoleRepository, PersonRoleRepository>();
+        services.AddScoped<IDevGroupRepository, DevGroupRepository>();
+        services.AddScoped<IDevGroupMemberRepository, DevGroupMemberRepository>();
         services.AddScoped<ITaskGroupRepository, TaskGroupRepository>();
         services.AddScoped<IPlanningTaskRepository, PlanningTaskRepository>();
         services.AddScoped<IImportBatchRepository, ImportBatchRepository>();
@@ -46,13 +49,15 @@ public static class DependencyInjection
 
         // Services
         services.AddScoped<IProjectService, ProjectService>();
-        services.AddScoped<ITaskService, TaskService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IImportService, ImportService>();
+        services.AddScoped<IImportValidator, ImportValidator>();
         services.AddScoped<ITaskGroupService, TaskGroupService>();
         services.AddScoped<IPlanningTaskService, PlanningTaskService>();
         services.AddScoped<IPeriodService, PeriodService>();
         services.AddScoped<IPersonService, PersonService>();
+        services.AddScoped<IRoleService, RoleService>();
+        services.AddScoped<IDevGroupService, DevGroupService>();
         services.AddScoped<ISettingsService, SettingsService>();
 
         // Parsing

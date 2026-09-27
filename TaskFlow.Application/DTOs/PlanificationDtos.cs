@@ -15,6 +15,8 @@ public record PersonDto
     public Guid Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public string? UserId { get; init; }
+    public List<string> Roles { get; init; } = new();
+    public List<Guid> RoleIds { get; init; } = new();
 }
 
 public record ImportBatchDto
@@ -34,13 +36,24 @@ public record ImportBatchDto
 public record PlanningTaskDto
 {
     public Guid Id { get; init; }
-    public Guid TaskGroupId { get; init; }
-    public int Number { get; init; }
+
+    /// <summary>NULL en tareas de backlog.</summary>
+    public Guid? TaskGroupId { get; init; }
+
+    /// <summary>NULL en las tareas de período de un bloque QA-only.</summary>
+    public Guid? ProjectId { get; init; }
+    public string? ProjectName { get; init; }
+
+    /// <summary>Naming del TXT. NULL en tareas de backlog.</summary>
+    public int? Number { get; init; }
     public int? SubNumber { get; init; }
+
     public Guid? AssignedPersonId { get; init; }
     public string? AssignedPersonName { get; init; }
     public TaskSource Source { get; init; }
     public string Description { get; init; } = string.Empty;
+
+    public bool IsBacklog => TaskGroupId == null;
 }
 
 public record TaskGroupDto
@@ -69,4 +82,39 @@ public record ImportResultDto
     public int TasksImported { get; set; }
     public int TasksRemoved { get; set; }
     public List<string> Warnings { get; set; } = new();
+}
+
+public record DevGroupMemberDto
+{
+    public Guid PersonId { get; init; }
+    public string PersonName { get; init; } = string.Empty;
+}
+
+public record DevGroupDto
+{
+    public Guid Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string? Description { get; init; }
+    public bool IsActive { get; init; }
+    public int MemberCount { get; init; }
+    public int ProjectCount { get; init; }
+    public List<DevGroupMemberDto> Members { get; init; } = new();
+}
+
+public record CreateDevGroupDto
+{
+    public string Name { get; init; } = string.Empty;
+    public string? Description { get; init; }
+    public List<Guid> MemberIds { get; init; } = new();
+}
+
+public record UpdateDevGroupDto
+{
+    public string Name { get; init; } = string.Empty;
+    public string? Description { get; init; }
+}
+
+public record SetDevGroupMembersDto
+{
+    public List<Guid> PersonIds { get; init; } = new();
 }

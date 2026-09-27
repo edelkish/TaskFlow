@@ -5,7 +5,9 @@ namespace TaskFlow.Domain.Entities;
 /// </summary>
 public class TaskGroup : BaseEntity
 {
-    public Guid ImportBatchId { get; set; }
+    /// <summary>Lote de importación que originó el grupo. NULL si se creó manualmente.</summary>
+    public Guid? ImportBatchId { get; set; }
+
     public Guid PeriodId { get; set; }
 
     /// <summary>NULL en bloques QA-only.</summary>

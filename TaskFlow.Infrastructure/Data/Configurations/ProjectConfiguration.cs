@@ -10,9 +10,12 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
     {
         builder.HasKey(p => p.Id);
 
+        // Misma collation que People.Name para que la comparación por nombre sea
+        // consistente entre proyectos y personas al validar el TXT.
         builder.Property(p => p.Name)
             .IsRequired()
-            .HasMaxLength(200);
+            .HasMaxLength(200)
+            .UseCollation("Latin1_General_CI_AI");
 
         builder.Property(p => p.Description)
             .HasMaxLength(2000);
@@ -30,7 +33,12 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.HasIndex(p => p.Name)
             .IsUnique();
 
-        builder.HasMany(p => p.Tasks)
+        builder.HasOne(p => p.DevGroup)
+            .WithMany(g => g.Projects)
+            .HasForeignKey(p => p.DevGroupId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasMany(p => p.PlanningTasks)
             .WithOne(t => t.Project)
             .HasForeignKey(t => t.ProjectId)
             .OnDelete(DeleteBehavior.Cascade);

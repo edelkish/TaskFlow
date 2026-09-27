@@ -55,7 +55,7 @@ else
     <div class="col-md-3 col-6">
         <div class="card h-100">
             <div class="card-body">
-                <p class="text-secondary small mb-1">Tareas planificadas</p>
+                <p class="text-secondary small mb-1">Tareas en backlog</p>
                 <h3 class="mb-0 fw-bold">@Projects.Sum(p => p.TaskCount)</h3>
             </div>
         </div>
@@ -77,9 +77,12 @@ else
             <option value="activos">Activos</option>
             <option value="finalizados">Finalizados</option>
         </select>
-        <button class="btn btn-primary btn-sm" type="button" @onclick="() => ShowCreate = !ShowCreate">
-            <i class="bi bi-plus-lg me-1"></i> Nuevo proyecto
-        </button>
+        @if (AuthState.CanEditMasterData)
+        {
+            <button class="btn btn-primary btn-sm" type="button" @onclick="() => ShowCreate = !ShowCreate">
+                <i class="bi bi-plus-lg me-1"></i> Nuevo proyecto
+            </button>
+        }
     </div>
 
     @if (ShowCreate)
@@ -118,6 +121,17 @@ else
                                 <label class="form-label">Progreso (%)</label>
                                 <input type="number" class="form-control" min="0" max="100" @bind="NewProgress" />
                             </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Grupo de desarrollo</label>
+                                <select class="form-select" @bind="NewDevGroupId">
+                                    <option value="">Sin grupo</option>
+                                    @foreach (var g in DevGroups)
+                                    {
+                                        <option value="@g.Id">@g.Name</option>
+                                    }
+                                </select>
+                                <div class="form-text">La importación avisa si el Dev o el QA no pertenece al grupo.</div>
+                            </div>
                         </div>
                         <div class="mt-3">
                             <button type="button" class="btn btn-primary btn-sm" disabled="@Busy" @onclick="CreateAsync">
@@ -138,18 +152,22 @@ else
                     <tr>
                         <th>Proyecto</th>
                         <th>Estado</th>
+                        <th>Grupo dev.</th>
                         <th>Versión</th>
                         <th>Progreso</th>
-                        <th>Tareas</th>
+                        <th>Backlog</th>
                         <th>Inicio</th>
                         <th>Fin</th>
-                        <th class="text-end">Acciones</th>
+                        @if (AuthState.CanEditMasterData)
+                        {
+                            <th class="text-end">Acciones</th>
+                        }
                     </tr>
                 </thead>
                 <tbody>
                     @if (PagedProjects.Count == 0)
                     {
-                        <tr><td colspan="8" class="text-center text-secondary">No hay proyectos que coincidan con el filtro.</td></tr>
+                        <tr><td colspan="@(AuthState.CanEditMasterData ? 9 : 8)" class="text-center text-secondary">No hay proyectos que coincidan con el filtro.</td></tr>
                     }
                     else
                     {
@@ -173,6 +191,16 @@ else
                                         <span class="badge text-bg-secondary">Finalizado</span>
                                     }
                                 </td>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(p.DevGroupName))
+                                    {
+                                        <span class="badge text-bg-info">@p.DevGroupName</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-secondary">—</span>
+                                    }
+                                </td>
                                 <td>@(string.IsNullOrWhiteSpace(p.Version) ? "—" : p.Version)</td>
                                 <td style="min-width: 10rem">
                                     <div class="d-flex align-items-center gap-2">
@@ -187,21 +215,24 @@ else
                                 <td><span class="badge text-bg-primary">@p.TaskCount</span></td>
                                 <td class="text-nowrap">@p.StartDate.ToString("dd/MM/yyyy")</td>
                                 <td class="text-nowrap">@(p.EndDate.HasValue ? p.EndDate.Value.ToString("dd/MM/yyyy") : "—")</td>
-                                <td class="text-end">
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-secondary" type="button" title="Editar" @onclick="() => ToggleEdit(p)">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <button class="btn btn-outline-danger" type="button" title="Eliminar" @onclick="() => DeleteAsync(p)">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
+                                @if (AuthState.CanEditMasterData)
+                                {
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-secondary" type="button" title="Editar" @onclick="() => ToggleEdit(p)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" type="button" title="Eliminar" @onclick="() => DeleteAsync(p)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                }
                             </tr>
                             @if (Edit != null && Edit.Id == p.Id)
                             {
                                 <tr>
-                                    <td colspan="8">
+                                    <td colspan="@(AuthState.CanEditMasterData ? 8 : 9)">
                                         <form class="needs-validation" novalidate @ref="_editForm">
                                             <div class="row g-2">
                                                 <div class="col-md-4">
@@ -234,6 +265,16 @@ else
                                                 <div class="col-md-2">
                                                     <label class="form-label">Progreso (%)</label>
                                                     <input type="number" class="form-control form-control-sm" min="0" max="100" @bind="EditProgress" />
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label">Grupo de desarrollo</label>
+                                                    <select class="form-select form-select-sm" @bind="EditDevGroupId">
+                                                        <option value="">Sin grupo</option>
+                                                        @foreach (var g in DevGroups)
+                                                        {
+                                                            <option value="@g.Id">@g.Name</option>
+                                                        }
+                                                    </select>
                                                 </div>
                                             </div>
                                         </form>
@@ -277,6 +318,7 @@ else
     private ElementReference _editForm;
 
     private List<TaskFlow.Application.DTOs.ProjectDto> Projects { get; set; } = new();
+    private List<TaskFlow.Application.DTOs.DevGroupDto> DevGroups { get; set; } = new();
     private bool ShowCreate { get; set; }
     private bool Busy { get; set; }
     private int CurrentPage { get; set; } = 1;
@@ -290,6 +332,7 @@ else
     private DateTime? NewEndDate { get; set; }
     private string NewVersion { get; set; } = string.Empty;
     private int NewProgress { get; set; }
+    private string NewDevGroupId { get; set; } = string.Empty;
 
     private TaskFlow.Application.DTOs.ProjectDto? Edit { get; set; }
     private string EditName { get; set; } = string.Empty;
@@ -297,6 +340,7 @@ else
     private DateTime? EditEndDate { get; set; }
     private string EditVersion { get; set; } = string.Empty;
     private int EditProgress { get; set; }
+    private string EditDevGroupId { get; set; } = string.Empty;
 
     private List<TaskFlow.Application.DTOs.ProjectDto> FilteredProjects =>
         Projects
@@ -338,6 +382,7 @@ else
         try
         {
             Projects = await Api.GetProjectsAsync() ?? new();
+            DevGroups = await Api.GetDevGroupsAsync() ?? new();
         }
         catch (Exception ex)
         {
@@ -349,6 +394,9 @@ else
             IsLoading = false;
         }
     }
+
+    private static Guid? ParseId(string? value)
+        => Guid.TryParse(value, out var id) ? id : null;
 
     private void ResetPage() => CurrentPage = 1;
 
@@ -384,7 +432,8 @@ else
                 StartDate = NewStartDate ?? DateTime.Today,
                 EndDate = NewEndDate,
                 Version = string.IsNullOrWhiteSpace(NewVersion) ? null : NewVersion.Trim(),
-                Progress = NewProgress
+                Progress = NewProgress,
+                DevGroupId = ParseId(NewDevGroupId)
             });
             ShowCreate = false;
             NewName = string.Empty;
@@ -393,6 +442,7 @@ else
             NewEndDate = null;
             NewVersion = string.Empty;
             NewProgress = 0;
+            NewDevGroupId = string.Empty;
             await Toast.SuccessAsync("Proyecto creado correctamente.");
             await LoadAsync();
         }
@@ -419,6 +469,7 @@ else
         EditEndDate = project.EndDate;
         EditVersion = project.Version ?? string.Empty;
         EditProgress = project.Progress;
+        EditDevGroupId = project.DevGroupId?.ToString() ?? string.Empty;
     }
 
     private void CancelEdit()
@@ -448,7 +499,8 @@ else
                 Description = string.IsNullOrWhiteSpace(EditDescription) ? null : EditDescription.Trim(),
                 EndDate = EditEndDate,
                 Version = string.IsNullOrWhiteSpace(EditVersion) ? null : EditVersion.Trim(),
-                Progress = EditProgress
+                Progress = EditProgress,
+                DevGroupId = ParseId(EditDevGroupId)
             });
             CancelEdit();
             await Toast.SuccessAsync("Proyecto actualizado correctamente.");

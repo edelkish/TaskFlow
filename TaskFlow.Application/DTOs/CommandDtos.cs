@@ -20,10 +20,15 @@ public record UpdateTaskGroupDto
     public Guid? QaPersonId { get; init; }
 }
 
+/// <summary>
+/// Tarea de periodo (TaskGroupId informado, con Number) o de backlog
+/// (TaskGroupId null, con ProjectId).
+/// </summary>
 public record CreatePlanningTaskDto
 {
-    public Guid TaskGroupId { get; init; }
-    public int Number { get; init; }
+    public Guid? TaskGroupId { get; init; }
+    public Guid? ProjectId { get; init; }
+    public int? Number { get; init; }
     public int? SubNumber { get; init; }
     public Guid? AssignedPersonId { get; init; }
     public string Description { get; init; } = string.Empty;
@@ -31,7 +36,7 @@ public record CreatePlanningTaskDto
 
 public record UpdatePlanningTaskDto
 {
-    public int Number { get; init; }
+    public int? Number { get; init; }
     public int? SubNumber { get; init; }
     public Guid? AssignedPersonId { get; init; }
     public string Description { get; init; } = string.Empty;

@@ -28,6 +28,15 @@ public class TaskGroupRepository : GenericRepository<TaskGroup>, ITaskGroupRepos
                                       && g.QaPersonId == qaPersonId);
     }
 
+    public async Task<TaskGroup?> GetByQaWithProjectBlockKeyAsync(Guid periodId, Guid projectId, Guid qaPersonId)
+    {
+        return await _context.TaskGroups
+            .FirstOrDefaultAsync(g => g.PeriodId == periodId
+                                      && g.ProjectId == projectId
+                                      && g.DevPersonId == null
+                                      && g.QaPersonId == qaPersonId);
+    }
+
     public async Task<IEnumerable<TaskGroup>> GetByPeriodAsync(Guid periodId)
     {
         return await _context.TaskGroups
@@ -79,14 +88,37 @@ public class PlanningTaskRepository : GenericRepository<PlanningTask>, IPlanning
             .ToListAsync();
     }
 
+    public async Task<IEnumerable<PlanningTask>> GetBacklogAsync(Guid? projectId = null, Guid? assigneeId = null)
+    {
+        var query = _context.PlanningTasks
+            .Where(t => t.TaskGroupId == null);
+
+        if (projectId.HasValue)
+        {
+            query = query.Where(t => t.ProjectId == projectId.Value);
+        }
+
+        if (assigneeId.HasValue)
+        {
+            query = query.Where(t => t.AssignedPersonId == assigneeId.Value);
+        }
+
+        return await query
+            .Include(t => t.Project)
+            .Include(t => t.AssignedPerson)
+            .OrderBy(t => t.Project.Name)
+            .ThenByDescending(t => t.CreatedAt)
+            .ToListAsync();
+    }
+
     public async Task<IEnumerable<PlanningTask>> GetByAssigneeAsync(Guid personId)
     {
         return await _context.PlanningTasks
             .Where(t => t.AssignedPersonId == personId)
+            .Include(t => t.Project)
             .Include(t => t.TaskGroup)
-            .ThenInclude(g => g.Project)
-            .OrderByDescending(t => t.TaskGroup.Period.Year)
-            .ThenByDescending(t => t.TaskGroup.Period.Month)
+                .ThenInclude(g => g.Period)
+            .OrderByDescending(t => t.CreatedAt)
             .ToListAsync();
     }
 

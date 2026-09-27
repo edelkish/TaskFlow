@@ -8,16 +8,189 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h3 class="card-title"><i class="bi bi-list-check me-2"></i>Tareas del grupo</h3>
-                @if (Group != null)
+                <h3 class="card-title"><i class="bi bi-list-check me-2"></i>Tareas</h3>
+                @if (Group != null && !IsBacklogTab)
                 {
                     <span class="badge text-bg-secondary">@Group.PeriodName</span>
                 }
+                @if (IsBacklogTab)
+                {
+                    <span class="badge text-bg-info">Backlog · sin período</span>
+                }
             </div>
             <div class="card-body">
+                <ul class="nav nav-tabs mb-3">
+                    <li class="nav-item">
+                        <a class="nav-link @(IsBacklogTab ? "" : "active")" href="#" @onclick="() => SwitchTab(false)" @onclick:preventDefault>
+                            <i class="bi bi-calendar3 me-1"></i> Período
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link @(IsBacklogTab ? "active" : "")" href="#" @onclick="() => SwitchTab(true)" @onclick:preventDefault>
+                            <i class="bi bi-inbox me-1"></i> Backlog
+                        </a>
+                    </li>
+                </ul>
+
                 @if (IsLoading)
                 {
                     <LoadingSpinner />
+                }
+                else if (IsBacklogTab)
+                {
+                    @if (!AuthState.CanEditMasterData)
+                    {
+                        <div class="callout callout-warning">
+                            <i class="bi bi-eye me-1"></i> Solo lectura: el backlog se mantiene
+                            <code>Admin</code> y <code>Planificación</code>.
+                        </div>
+                    }
+
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Proyecto</label>
+                            <select class="form-select" @bind="FilterProjectId" @bind:after="LoadBacklogAsync">
+                                <option value="">Todos los proyectos</option>
+                                @foreach (var p in Projects)
+                                {
+                                    <option value="@p.Id">@p.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Asignado a</label>
+                            <select class="form-select" @bind="FilterAssigneeId" @bind:after="LoadBacklogAsync">
+                                <option value="">Sin filtro</option>
+                                @foreach (var p in People)
+                                {
+                                    <option value="@p.Id">@p.Name</option>
+                                }
+                            </select>
+                        </div>
+                        @if (AuthState.CanEditMasterData)
+                        {
+                            <div class="col-md-4 text-end">
+                                <button class="btn btn-sm btn-primary" @onclick="() => ShowBacklogCreate = true">
+                                    <i class="bi bi-plus-lg me-1"></i> Nueva tarea de backlog
+                                </button>
+                            </div>
+                        }
+                    </div>
+
+                    @if (ShowBacklogCreate)
+                    {
+                        <div class="card card-outline card-primary mb-3">
+                            <div class="card-body">
+                                <h6 class="mb-3">Nueva tarea de backlog</h6>
+                                <form class="needs-validation" novalidate @ref="_backlogCreateForm">
+                                    <div class="row g-2">
+                                        <div class="col-md-3">
+                                            <label class="form-label">Proyecto</label>
+                                            <select class="form-select" required @bind="NewBacklogProjectId">
+                                                <option value="">Seleccione…</option>
+                                                @foreach (var p in Projects)
+                                                {
+                                                    <option value="@p.Id">@p.Name</option>
+                                                }
+                                            </select>
+                                            <div class="invalid-feedback">El backlog cuelga de un proyecto.</div>
+                                        </div>
+                                        <div class="col-md-5">
+                                            <label class="form-label">Descripción</label>
+                                            <input type="text" class="form-control" maxlength="500" required @bind="NewBacklogDescription" />
+                                            <div class="invalid-feedback">La descripción es obligatoria.</div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label">Asignar a</label>
+                                            <select class="form-select" @bind="NewBacklogAssigneeId">
+                                                <option value="">Sin asignar</option>
+                                                @foreach (var p in People)
+                                                {
+                                                    <option value="@p.Id">@p.Name</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 d-flex align-items-end gap-2">
+                                            <button type="button" class="btn btn-primary btn-sm" disabled="@Busy" @onclick="CreateBacklogTaskAsync">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-secondary btn-sm" @onclick="() => ShowBacklogCreate = false">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Descripción</th>
+                                    <th style="width: 200px">Proyecto</th>
+                                    <th style="width: 180px">Asignado</th>
+                                    <th style="width: 90px">Origen</th>
+                                    @if (AuthState.CanEditMasterData)
+                                    {
+                                        <th class="text-end" style="width: 160px">Acciones</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Backlog.Count == 0)
+                                {
+                                    <tr>
+                                        <td colspan="@BacklogColumnCount" class="text-center text-secondary">
+                                            No hay tareas de backlog para este filtro.
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var t in Backlog)
+                                    {
+                                        <tr>
+                                            <td>@t.Description</td>
+                                            <td class="text-secondary">@(t.ProjectName ?? "—")</td>
+                                            <td>
+                                                @if (AuthState.CanEditMasterData)
+                                                {
+                                                    <select class="form-select form-select-sm"
+                                                            value="@(t.AssignedPersonId?.ToString() ?? "")"
+                                                            @onchange="(e) => ReassignAsync(t, e.Value?.ToString())">
+                                                        <option value="">Sin asignar</option>
+                                                        @foreach (var p in People)
+                                                        {
+                                                            <option value="@p.Id">@p.Name</option>
+                                                        }
+                                                    </select>
+                                                }
+                                                else
+                                                {
+                                                    <span>@(t.AssignedPersonName ?? "Sin asignar")</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <span class="badge @(t.Source == TaskFlow.Domain.Enums.TaskSource.Import ? "text-bg-warning" : "text-bg-secondary")">
+                                                    @(t.Source == TaskFlow.Domain.Enums.TaskSource.Import ? "Importada" : "Manual")
+                                                </span>
+                                            </td>
+                                            @if (AuthState.CanEditMasterData)
+                                            {
+                                                <td class="text-end">
+                                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(t)">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </td>
+                                            }
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
                 }
                 else if (Group != null)
                 {
@@ -25,10 +198,13 @@
                         <div class="col-md-3"><i class="bi bi-code-slash me-1 text-primary"></i><strong>Dev:</strong> @(Group.DevName ?? "—")</div>
                         <div class="col-md-3"><i class="bi bi-person-check me-1 text-info"></i><strong>Team Lead:</strong> @(Group.TeamLeadName ?? "—")</div>
                         <div class="col-md-3"><i class="bi bi-person-check me-1 text-warning"></i><strong>QA:</strong> @(Group.QaName ?? "—")</div>
-                        <div class="col-md-3">
-                            <button class="btn btn-sm btn-primary" @onclick="() => ShowCreate = true">
-                                <i class="bi bi-plus-lg me-1"></i> Nueva tarea
-                            </button>
+                        <div class="col-md-3 text-end">
+                            @if (AuthState.CanEditMasterData)
+                            {
+                                <button class="btn btn-sm btn-primary" @onclick="() => ShowCreate = true">
+                                    <i class="bi bi-plus-lg me-1"></i> Nueva tarea
+                                </button>
+                            }
                         </div>
                     </div>
 
@@ -78,13 +254,16 @@
                                     <th>Descripción</th>
                                     <th style="width: 180px">Asignado</th>
                                     <th style="width: 90px">Origen</th>
-                                    <th class="text-end" style="width: 160px">Acciones</th>
+                                    @if (AuthState.CanEditMasterData)
+                                    {
+                                        <th class="text-end" style="width: 160px">Acciones</th>
+                                    }
                                 </tr>
                             </thead>
                             <tbody>
                                 @if (Group.Tasks.Count == 0)
                                 {
-                                    <tr><td colspan="5" class="text-center text-secondary">Este grupo no tiene tareas.</td></tr>
+                                    <tr><td colspan="@GroupColumnCount" class="text-center text-secondary">Este grupo no tiene tareas.</td></tr>
                                 }
                                 else
                                 {
@@ -121,14 +300,17 @@
                                                     <span class="badge text-bg-secondary">Manual</span>
                                                 }
                                             </td>
-                                            <td class="text-end">
-                                                <button class="btn btn-sm btn-outline-primary" @onclick="() => ToggleEdit(t)">
-                                                    <i class="bi bi-pencil"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(t)">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </td>
+                                            @if (AuthState.CanEditMasterData)
+                                            {
+                                                <td class="text-end">
+                                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ToggleEdit(t)">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(t)">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </td>
+                                            }
                                         </tr>
                                         @if (EditTask != null && EditTask.Id == t.Id)
                                         {
@@ -177,8 +359,21 @@
                 }
                 else
                 {
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Grupo de tareas del período</label>
+                            <select class="form-select" @bind="GroupId" @bind:after="LoadGroupAsync">
+                                <option value="">Seleccione un grupo…</option>
+                                @foreach (var g in Groups)
+                                {
+                                    <option value="@g.Id">@g.PeriodName — @(g.ProjectName ?? g.QaName ?? "sin proyecto")</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
                     <div class="text-center text-secondary py-4">
-                        Seleccione un grupo desde la pantalla <a href="grupos">Grupos de tareas</a>.
+                        Seleccione un grupo para ver sus tareas de período, o vaya a
+                        <a href="grupos">Grupos de tareas</a>.
                     </div>
                 }
             </div>
@@ -189,11 +384,20 @@
 @code {
     private ElementReference _createForm;
     private ElementReference _editForm;
+    private ElementReference _backlogCreateForm;
+
+    private bool IsBacklogTab { get; set; }
 
     private Guid GroupId { get; set; } = Guid.Empty;
     private TaskFlow.Application.DTOs.TaskGroupDto? Group { get; set; }
+    private List<TaskFlow.Application.DTOs.TaskGroupDto> Groups { get; set; } = new();
+    private List<TaskFlow.Application.DTOs.PersonDto> People { get; set; } = new();
+    private List<TaskFlow.Application.DTOs.ProjectDto> Projects { get; set; } = new();
+    private List<TaskFlow.Application.DTOs.PlanningTaskDto> Backlog { get; set; } = new();
     private Dictionary<string, string> GroupMembers { get; set; } = new();
+
     private bool ShowCreate { get; set; }
+    private bool ShowBacklogCreate { get; set; }
     private bool Busy { get; set; }
 
     private int NewNumber { get; set; } = 1;
@@ -201,11 +405,21 @@
     private string NewDescription { get; set; } = string.Empty;
     private string NewAssignedId { get; set; } = string.Empty;
 
+    private string NewBacklogProjectId { get; set; } = string.Empty;
+    private string NewBacklogDescription { get; set; } = string.Empty;
+    private string NewBacklogAssigneeId { get; set; } = string.Empty;
+
+    private string FilterProjectId { get; set; } = string.Empty;
+    private string FilterAssigneeId { get; set; } = string.Empty;
+
     private TaskFlow.Application.DTOs.PlanningTaskDto? EditTask { get; set; }
     private int EditNumber { get; set; }
     private int? EditSubNumber { get; set; }
     private string EditDescription { get; set; } = string.Empty;
     private string EditAssignedId { get; set; } = string.Empty;
+
+    private int GroupColumnCount => AuthState.CanEditMasterData ? 5 : 4;
+    private int BacklogColumnCount => AuthState.CanEditMasterData ? 5 : 4;
 
     protected override async Task OnInitializedAsync()
     {
@@ -216,6 +430,11 @@
             GroupId = id;
         }
 
+        if (query["vista"] == "backlog")
+        {
+            IsBacklogTab = true;
+        }
+
         await LoadAsync();
     }
 
@@ -224,10 +443,17 @@
         LoadError = null;
         try
         {
-            if (GroupId != Guid.Empty)
+            Groups = (await Api.GetGroupsAsync()) ?? new List<TaskFlow.Application.DTOs.TaskGroupDto>();
+            People = (await Api.GetPeopleAsync()) ?? new List<TaskFlow.Application.DTOs.PersonDto>();
+            Projects = (await Api.GetProjectsAsync()) ?? new List<TaskFlow.Application.DTOs.ProjectDto>();
+
+            if (IsBacklogTab)
             {
-                Group = await Api.GetGroupAsync(GroupId);
-                GroupMembers = BuildMembers();
+                await LoadBacklogAsync();
+            }
+            else if (GroupId != Guid.Empty)
+            {
+                await LoadGroupAsync();
             }
         }
         catch (Exception ex)
@@ -238,6 +464,49 @@
         {
             IsLoading = false;
         }
+    }
+
+    private async Task SwitchTab(bool backlog)
+    {
+        if (IsBacklogTab == backlog)
+        {
+            return;
+        }
+
+        IsBacklogTab = backlog;
+        IsLoading = true;
+        try
+        {
+            if (backlog)
+            {
+                await LoadBacklogAsync();
+            }
+            else if (GroupId != Guid.Empty)
+            {
+                await LoadGroupAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            await Toast.ErrorAsync(ex.Message);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task LoadGroupAsync()
+    {
+        Group = GroupId == Guid.Empty ? null : await Api.GetGroupAsync(GroupId);
+        GroupMembers = Group == null ? new Dictionary<string, string>() : BuildMembers();
+    }
+
+    private async Task LoadBacklogAsync()
+    {
+        Backlog = (await Api.GetBacklogAsync(
+            ParseId(FilterProjectId),
+            ParseId(FilterAssigneeId))) ?? new List<TaskFlow.Application.DTOs.PlanningTaskDto>();
     }
 
     private Dictionary<string, string> BuildMembers()
@@ -270,7 +539,7 @@
             {
                 TaskGroupId = GroupId,
                 Number = NewNumber,
-                SubNumber = string.IsNullOrWhiteSpace(NewSubNumber?.ToString()) ? null : NewSubNumber,
+                SubNumber = NewSubNumber,
                 AssignedPersonId = ParseId(NewAssignedId),
                 Description = NewDescription.Trim()
             });
@@ -278,7 +547,47 @@
             NewDescription = string.Empty;
             NewNumber++;
             await Toast.SuccessAsync("Tarea creada correctamente.");
-            await LoadAsync();
+            await LoadGroupAsync();
+        }
+        catch (Exception ex)
+        {
+            await Toast.ErrorAsync(ex.Message);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task CreateBacklogTaskAsync()
+    {
+        if (!await Toast.ValidateFormAsync(_backlogCreateForm))
+        {
+            return;
+        }
+
+        var projectId = ParseId(NewBacklogProjectId);
+        if (projectId == null)
+        {
+            await Toast.ErrorAsync("Seleccione un proyecto para la tarea de backlog.");
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            await Api.CreateTaskAsync(new TaskFlow.Application.DTOs.CreatePlanningTaskDto
+            {
+                ProjectId = projectId,
+                AssignedPersonId = ParseId(NewBacklogAssigneeId),
+                Description = NewBacklogDescription.Trim()
+            });
+            ShowBacklogCreate = false;
+            NewBacklogDescription = string.Empty;
+            NewBacklogProjectId = string.Empty;
+            NewBacklogAssigneeId = string.Empty;
+            await Toast.SuccessAsync("Tarea de backlog creada.");
+            await LoadBacklogAsync();
         }
         catch (Exception ex)
         {
@@ -296,7 +605,14 @@
         {
             await Api.ReassignTaskAsync(task.Id, ParseId(personId));
             await Toast.SuccessAsync("Tarea reasignada.");
-            await LoadAsync();
+            if (task.IsBacklog)
+            {
+                await LoadBacklogAsync();
+            }
+            else
+            {
+                await LoadGroupAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -312,7 +628,7 @@
             return;
         }
         EditTask = task;
-        EditNumber = task.Number;
+        EditNumber = task.Number ?? 0;
         EditSubNumber = task.SubNumber;
         EditDescription = task.Description;
         EditAssignedId = task.AssignedPersonId?.ToString() ?? string.Empty;
@@ -336,13 +652,13 @@
             await Api.UpdateTaskAsync(task.Id, new TaskFlow.Application.DTOs.UpdatePlanningTaskDto
             {
                 Number = EditNumber,
-                SubNumber = string.IsNullOrWhiteSpace(EditSubNumber?.ToString()) ? null : EditSubNumber,
+                SubNumber = EditSubNumber,
                 AssignedPersonId = ParseId(EditAssignedId),
                 Description = EditDescription.Trim()
             });
             CancelEdit();
             await Toast.SuccessAsync("Tarea actualizada correctamente.");
-            await LoadAsync();
+            await LoadGroupAsync();
         }
         catch (Exception ex)
         {
@@ -360,7 +676,14 @@
         {
             await Api.DeleteTaskFromGroupAsync(task.Id);
             await Toast.SuccessAsync("Tarea eliminada.");
-            await LoadAsync();
+            if (task.IsBacklog)
+            {
+                await LoadBacklogAsync();
+            }
+            else
+            {
+                await LoadGroupAsync();
+            }
         }
         catch (Exception ex)
         {
