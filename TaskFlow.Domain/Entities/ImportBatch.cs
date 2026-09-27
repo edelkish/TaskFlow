@@ -7,7 +7,13 @@ namespace TaskFlow.Domain.Entities;
 /// </summary>
 public class ImportBatch : BaseEntity
 {
-    public Guid PeriodId { get; set; }
+    /// <summary>
+    /// Nullable a propósito: un intento rechazado por un periodo inexistente debe poder
+    /// auditarse igual. Si fuera obligatorio, el rechazo más común ni siquiera se podría
+    /// registrar.
+    /// </summary>
+    public Guid? PeriodId { get; set; }
+
     public string FileName { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;
     public string FileEncoding { get; set; } = string.Empty;
@@ -19,6 +25,6 @@ public class ImportBatch : BaseEntity
     public DateTime ImportedAt { get; set; }
 
     // Navigation properties
-    public Period Period { get; set; } = null!;
+    public Period? Period { get; set; }
     public ICollection<TaskGroup> TaskGroups { get; set; } = new List<TaskGroup>();
 }

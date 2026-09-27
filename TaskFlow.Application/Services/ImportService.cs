@@ -10,119 +10,185 @@ namespace TaskFlow.Application.Services;
 public class ImportService : IImportService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IImportValidator _validator;
     private readonly ITaskFileParser _parser;
     private readonly IMapper _mapper;
 
-    public ImportService(IUnitOfWork unitOfWork, ITaskFileParser parser, IMapper mapper)
+    public ImportService(IUnitOfWork unitOfWork, IImportValidator validator,
+        ITaskFileParser parser, IMapper mapper)
     {
         _unitOfWork = unitOfWork;
+        _validator = validator;
         _parser = parser;
         _mapper = mapper;
     }
 
-    public async Task<ImportResultDto> ImportTaskFileAsync(string filePath, CancellationToken cancellationToken = default)
+    public Task<ImportValidationDto> ValidateAsync(string filePath, CancellationToken cancellationToken = default) =>
+        _validator.ValidateAsync(filePath, cancellationToken);
+
+    public async Task<ImportExecutionDto> ImportTaskFileAsync(string filePath, CancellationToken cancellationToken = default)
     {
+        var validation = await _validator.ValidateAsync(filePath, cancellationToken);
+
+        if (!validation.IsValid)
+        {
+            var rejectedBatchId = await RecordRejectionAsync(validation, cancellationToken);
+            return new ImportExecutionDto
+            {
+                Accepted = false,
+                Validation = validation,
+                RejectedBatchId = rejectedBatchId
+            };
+        }
+
         var parsed = await _parser.ParseAsync(filePath, cancellationToken);
 
-        var result = new ImportResultDto { PeriodName = parsed.PeriodName };
-        var notes = new List<string>(parsed.Warnings);
+        // La validación garantiza que el periodo existe; sin este guardia, unalguna
+        // inconsistencia entre ambas consultas produciría un NullReferenceException.
+        var period = await _unitOfWork.Periods.GetByMonthYearAsync(parsed.Month, parsed.Year)
+                     ?? throw new InvalidOperationException(
+                         $"El periodo '{parsed.PeriodName}' dejó de existir entre la validación y la importación.");
 
-        if (parsed.Month == 0 || parsed.Year == 0)
-        {
-            return new ImportResultDto
-            {
-                PeriodName = parsed.PeriodName,
-                Warnings = parsed.Warnings
-            };
-        }
+        // El lote queda Partial si hubo cualquier advertencia, venga del parser (líneas raras)
+        // o del validador (Dev fuera del grupo de desarrollo, proyecto inactivo...). Mirar
+        // solo parsed.Findings dejaba los warnings del validador invisibles en el historial.
+        var findings = parsed.Findings.Concat(validation.Findings).ToList();
 
-        var period = await _unitOfWork.Periods.GetByMonthYearAsync(parsed.Month, parsed.Year);
-        if (period == null)
+        var result = new ImportResultDto
         {
-            period = new Period
-            {
-                Month = parsed.Month,
-                Year = parsed.Year,
-                Name = parsed.PeriodName,
-                IsActive = true
-            };
-            await _unitOfWork.Periods.AddAsync(period);
-        }
-
-        var batch = new ImportBatch
-        {
-            PeriodId = period.Id,
-            FileName = parsed.FileName,
-            FilePath = parsed.FilePath,
-            FileEncoding = parsed.FileEncoding,
-            Status = parsed.Warnings.Count > 0 ? ImportStatus.Partial : ImportStatus.Success,
-            SectionsCount = parsed.Groups.Count,
-            WarningsCount = parsed.Warnings.Count,
-            Note = parsed.Warnings.Count > 0 ? string.Join(Environment.NewLine, parsed.Warnings) : null,
-            ImportedAt = DateTime.UtcNow
+            PeriodName = parsed.PeriodName,
+            Warnings = findings.Select(f => f.Message).ToList()
         };
 
-        foreach (var group in parsed.Groups)
+        // Todo el lote es atómico: si algo falla a mitad de camino, el rollback deja
+        // planificación, grupos y tareas exactamente como estaban.
+        await using var transaction = await _unitOfWork.BeginTransactionAsync(cancellationToken);
+
+        try
         {
-            var (taskGroup, created, removed) = await ResolveTaskGroupAsync(period, group, batch);
-            if (taskGroup != null)
+            var batch = new ImportBatch
             {
+                PeriodId = period.Id,
+                FileName = parsed.FileName,
+                FilePath = parsed.FilePath,
+                FileEncoding = parsed.FileEncoding,
+                Status = findings.Count > 0 ? ImportStatus.Partial : ImportStatus.Success,
+                SectionsCount = parsed.Groups.Count,
+                WarningsCount = findings.Count,
+                Note = findings.Count > 0 ? Summarize(findings) : null,
+                ImportedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.ImportBatches.AddAsync(batch);
+
+            foreach (var group in parsed.Groups)
+            {
+                var (created, removed, imported) = await ApplyGroupAsync(period, group, batch, cancellationToken);
                 if (created) result.GroupsCreated++; else result.GroupsUpdated++;
-                result.TasksImported += group.Tasks.Count;
+                result.TasksImported += imported;
                 result.TasksRemoved += removed;
             }
+
+            batch.TasksCount = result.TasksImported;
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            result.ImportBatchId = batch.Id;
+            return new ImportExecutionDto
+            {
+                Accepted = true,
+                Validation = validation,
+                Result = result
+            };
         }
-
-        batch.TasksCount = result.TasksImported;
-        await _unitOfWork.ImportBatches.AddAsync(batch);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        result.ImportBatchId = batch.Id;
-        result.Warnings = parsed.Warnings;
-        return result;
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
-    private async Task<(TaskGroup?, bool, int)> ResolveTaskGroupAsync(Period period, ParsedTaskGroupDto group, ImportBatch batch)
+    /// <summary>
+    /// Un intento rechazado no toca planificación, grupos ni tareas, pero sí queda
+    /// registrado como ImportStatus.Failed para poder auditar quién intentó qué y por qué
+    /// se rechazó. El periodo puede quedar null: el rechazo más común es precisamente
+    /// un periodo inexistente.
+    /// </summary>
+    private async Task<Guid?> RecordRejectionAsync(ImportValidationDto validation, CancellationToken cancellationToken)
     {
-        Person? dev = null;
-        Person? teamLead = null;
-        Person? qa = null;
-
-        if (!string.IsNullOrWhiteSpace(group.DevName))
+        try
         {
-            dev = await GetOrCreatePersonAsync(group.DevName.Trim());
-        }
+            var batch = new ImportBatch
+            {
+                PeriodId = validation.PeriodId,
+                FileName = validation.FileName,
+                FilePath = validation.FilePath,
+                FileEncoding = validation.FileEncoding,
+                Status = ImportStatus.Failed,
+                SectionsCount = validation.BlocksCount,
+                TasksCount = 0,
+                WarningsCount = validation.WarningsCount,
+                Note = Summarize(validation.Findings),
+                ImportedAt = DateTime.UtcNow
+            };
 
-        if (!string.IsNullOrWhiteSpace(group.TeamLeadName))
+            await _unitOfWork.ImportBatches.AddAsync(batch);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            return batch.Id;
+        }
+        catch
         {
-            teamLead = await GetOrCreatePersonAsync(group.TeamLeadName.Trim());
+            // Red de seguridad para fallos de infraestructura (base no disponible, etc.).
+            // Auditar el intento es deseable, pero nunca debe convertir un rechazo ya
+            // decidido en un error 500: el usuario igual no va a importar nada. Un
+            // ImportBatch null aquí significa que ni siquiera el registro del intento
+            // fallido se pudo guardar.
+            return null;
         }
+    }
 
-        if (!string.IsNullOrWhiteSpace(group.QaName))
-        {
-            qa = await GetOrCreatePersonAsync(group.QaName.Trim());
-        }
+    private async Task<(bool Created, int Removed, int Imported)> ApplyGroupAsync(
+        Period period,
+        ParsedTaskGroupDto group,
+        ImportBatch batch,
+        CancellationToken cancellationToken)
+    {
+        var dev = await ResolvePersonAsync(group.DevName);
+        var teamLead = await ResolvePersonAsync(group.TeamLeadName);
+        var qa = await ResolvePersonAsync(group.QaName);
 
+        // La validación ya garantizó que el proyecto existe; aquí solo se busca.
         Project? project = null;
         if (!string.IsNullOrWhiteSpace(group.ProjectName))
         {
-            project = await _unitOfWork.Projects.GetByNameCaseInsensitiveAsync(group.ProjectName.Trim())
-                       ?? await _unitOfWork.Projects.GetByNameAsync(group.ProjectName.Trim());
+            project = await _unitOfWork.Projects.GetByNameCaseInsensitiveAsync(group.ProjectName.Trim());
         }
 
         TaskGroup? taskGroup;
-        bool created;
 
+        // La clave de idempotencia depende de qué declara el bloque. Hay tres combinaciones
+        // posibles y cada una necesita su propia clave: si se usara la clave QA-only para un
+        // bloque que sí tiene App:, la búsqueda exigiría ProjectId NULL, no encontraría el
+        // grupo existente y cada reimportación crearía un duplicado.
         if (project != null && dev != null)
         {
             taskGroup = await _unitOfWork.TaskGroups.GetByDevBlockKeyAsync(period.Id, project.Id, dev.Id);
         }
+        else if (project != null && qa != null)
+        {
+            taskGroup = await _unitOfWork.TaskGroups.GetByQaWithProjectBlockKeyAsync(period.Id, project.Id, qa.Id);
+        }
+        else if (qa != null)
+        {
+            taskGroup = await _unitOfWork.TaskGroups.GetByQaBlockKeyAsync(period.Id, qa.Id);
+        }
         else
         {
-            taskGroup = qa != null
-                ? await _unitOfWork.TaskGroups.GetByQaBlockKeyAsync(period.Id, qa.Id)
-                : null;
+            taskGroup = null;
         }
+
+        var created = taskGroup == null;
 
         if (taskGroup == null)
         {
@@ -136,7 +202,6 @@ public class ImportService : IImportService
                 QaPersonId = qa?.Id,
                 IsActive = true
             };
-            created = true;
             await _unitOfWork.TaskGroups.AddAsync(taskGroup);
         }
         else
@@ -147,7 +212,6 @@ public class ImportService : IImportService
             taskGroup.DevPersonId = dev?.Id;
             taskGroup.TeamLeadPersonId = teamLead?.Id;
             taskGroup.QaPersonId = qa?.Id;
-            created = false;
         }
 
         // Semántica Reemplazar: se eliminan las tareas de origen importadas (se conservan manuales).
@@ -156,11 +220,13 @@ public class ImportService : IImportService
         // Auto-asignación: Dev del bloque, o QA en bloques QA-only.
         var assignee = dev ?? qa;
 
+        // El proyecto es NULL solo en bloques QA-only, que por definición no declaran App:.
         foreach (var task in group.Tasks)
         {
             await _unitOfWork.PlanningTasks.AddAsync(new PlanningTask
             {
                 TaskGroupId = taskGroup.Id,
+                ProjectId = project?.Id,
                 Number = task.Number,
                 SubNumber = task.SubNumber,
                 Description = task.Description,
@@ -170,19 +236,32 @@ public class ImportService : IImportService
             });
         }
 
-        return (taskGroup, created, removed);
+        return (created, removed, group.Tasks.Count);
     }
 
-    private async Task<Person> GetOrCreatePersonAsync(string name)
+    /// <summary>
+    /// Busca una persona ya existente. A diferencia de la versión anterior, nunca crea
+    /// una nueva: las personas son un maestro curado y la importación no inventa datos.
+    /// </summary>
+    private async Task<Person?> ResolvePersonAsync(string? name)
     {
-        var person = await _unitOfWork.People.GetByNameCaseInsensitiveAsync(name);
-        if (person == null)
+        if (string.IsNullOrWhiteSpace(name))
         {
-            person = new Person { Name = name, IsActive = true };
-            await _unitOfWork.People.AddAsync(person);
+            return null;
         }
 
-        return person;
+        return await _unitOfWork.People.GetByNameCaseInsensitiveAsync(name.Trim());
+    }
+
+    private static string Summarize(IEnumerable<ImportFindingDto> findings)
+    {
+        var ordered = findings
+            .OrderByDescending(f => f.Severity)
+            .ThenBy(f => f.Line)
+            .ToList();
+
+        return string.Join(Environment.NewLine, ordered.Select(f =>
+            f.Line > 0 ? $"[L{f.Line}] {f.Message}" : f.Message));
     }
 
     public async Task<IEnumerable<ImportBatchDto>> GetBatchesAsync(CancellationToken cancellationToken = default)

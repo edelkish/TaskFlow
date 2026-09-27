@@ -1,6 +1,7 @@
 @page "/import"
 @inherits TaskFlow.Blazor.Components.AuthenticatedPageBase
 @inject TaskFlow.Blazor.Services.ApiClient Api
+@using TaskFlow.Application.DTOs
 
 <PageTitle>Importar TXT</PageTitle>
 
@@ -11,21 +12,143 @@
                 <h3 class="card-title"><i class="bi bi-box-arrow-down me-2"></i>Importar planificación de tareas</h3>
             </div>
             <div class="card-body">
-                <form class="needs-validation" novalidate @ref="_importForm" @onsubmit="ImportAsync" @onsubmit:preventDefault>
+                @if (!AuthState.CanImport)
+                {
+                    <div class="callout callout-danger">
+                        <h5><i class="bi bi-shield-lock me-1"></i> Sin permiso para importar</h5>
+                        <p class="mb-0">
+                            La importación TXT está reservada a <code>Admin</code>, <code>Planificación</code>,
+                            <code>TeamLead</code> y <code>QA</code>. Su sesión no incluye ninguno de esos roles.
+                        </p>
+                    </div>
+                }
+                <div class="callout callout-warning">
+                    <h5><i class="bi bi-shield-exclamation me-1"></i> La importación es todo o nada</h5>
+                    <p class="mb-0">
+                        Si un solo periodo, proyecto, Dev, Team Lead o QA del archivo no está creado,
+                        <strong>no se importa nada</strong>. Valide primero para ver el detalle completo
+                        antes de decidir.
+                    </p>
+                </div>
+
+                <form class="needs-validation" novalidate @ref="_importForm" @onsubmit="ValidateAsync" @onsubmit:preventDefault>
                     <div class="row g-3">
                         <div class="col-md-8">
                             <label class="form-label">Ruta del archivo TXT</label>
-                            <input type="text" class="form-control" placeholder="D:\PT 2026\taskAgosto2026.txt" required @bind="FilePath" />
+                            <input type="text" class="form-control" placeholder="C:\PT 2026\taskAgosto2026.txt" required @bind="FilePath" />
                             <div class="invalid-feedback">Indique la ruta del archivo TXT.</div>
                         </div>
-                        <div class="col-md-4 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary" disabled="@Busy">
-                                <i class="bi bi-box-arrow-down me-1"></i>
-                                @(Busy ? "Importando..." : "Importar")
+                        <div class="col-md-4 d-flex align-items-end gap-2">
+                            <button type="submit" class="btn btn-outline-primary" disabled="@(Busy || !AuthState.CanImport)">
+                                <i class="bi bi-clipboard-check me-1"></i>
+                                @(Busy ? "Validando..." : "Validar")
+                            </button>
+                            <button type="button" class="btn btn-primary" disabled="@(Busy || !AuthState.CanImport || Validation == null || !Validation.IsValid)"
+                                    title="@ImportButtonHint" @onclick="ImportAsync">
+                                <i class="bi bi-box-arrow-down me-1"></i> Importar
                             </button>
                         </div>
                     </div>
                 </form>
+
+                @if (Validation != null)
+                {
+                    <hr />
+                    <h5>Resultado de la validación</h5>
+
+                    <div class="alert @(Validation.IsValid ? "alert-success" : "alert-danger") mt-3">
+                        <strong>@Validation.Summary</strong>
+                        @if (Validation.PeriodName is { Length: > 0 })
+                        {
+                            <div class="mt-1">
+                                Periodo detectado: <code>@Validation.PeriodName</code>
+                                @if (Validation.PeriodId == null && Validation.Month is > 0)
+                                {
+                                    <span class="text-danger">— no creado</span>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @if (Validation.Blocks.Count > 0)
+                    {
+                        <h6 class="mt-4">Bloques detectados</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover table-striped align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Línea</th>
+                                        <th>App</th>
+                                        <th>Dev</th>
+                                        <th>Team Lead</th>
+                                        <th>QA</th>
+                                        <th>Tareas</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var b in Validation.Blocks)
+                                    {
+                                        <tr class="@(b.IsValid ? "" : "table-danger")">
+                                            <td>@b.Index</td>
+                                            <td>@b.StartLine</td>
+                                            <td>@(b.ProjectName ?? "—")</td>
+                                            <td>@(b.DevName ?? "—")</td>
+                                            <td>@(b.TeamLeadName ?? "—")</td>
+                                            <td>@(b.QaName ?? "—")</td>
+                                            <td>@b.TasksCount</td>
+                                            <td>
+                                                @if (b.IsValid)
+                                                {
+                                                    <span class="badge text-bg-success">OK</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge text-bg-danger">
+                                                        @b.Findings.Count(f => f.Severity == ImportFindingSeverity.Error) error(es)
+                                                    </span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+
+                    @if (Validation.Findings.Count > 0)
+                    {
+                        <h6 class="mt-4">Hallazgos</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Línea</th>
+                                        <th>Bloque</th>
+                                        <th>Campo</th>
+                                        <th>Valor</th>
+                                        <th>Problema</th>
+                                        <th>Cómo resolverlo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var f in Validation.Findings)
+                                    {
+                                        <tr class="@(f.Severity == ImportFindingSeverity.Error ? "table-danger" : "table-warning")">
+                                            <td>@(f.Line > 0 ? f.Line.ToString() : "—")</td>
+                                            <td>@(f.BlockIndex > 0 ? f.BlockIndex.ToString() : "—")</td>
+                                            <td>@(f.Field ?? "—")</td>
+                                            <td><code>@f.Value</code></td>
+                                            <td>@f.Message</td>
+                                            <td class="text-secondary">@f.Resolution</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                }
 
                 @if (Result != null)
                 {
@@ -128,8 +251,16 @@
 
     private string FilePath { get; set; } = string.Empty;
     private bool Busy { get; set; }
+
+    private TaskFlow.Application.DTOs.ImportValidationDto? Validation { get; set; }
     private TaskFlow.Application.DTOs.ImportResultDto? Result { get; set; }
     private List<TaskFlow.Application.DTOs.ImportBatchDto>? Batches { get; set; }
+
+    private string ImportButtonHint => Validation == null
+        ? "Primero valide el archivo."
+        : Validation.IsValid
+            ? "Importa el archivo validado."
+            : "Corrija los errores y vuelva a validar: la importación está bloqueada.";
 
     protected override async Task OnInitializedAsync()
     {
@@ -154,7 +285,7 @@
         }
     }
 
-    private async Task ImportAsync()
+    private async Task ValidateAsync()
     {
         if (!await Toast.ValidateFormAsync(_importForm))
         {
@@ -162,16 +293,52 @@
         }
 
         Busy = true;
+        Result = null;
         try
         {
-            Result = await Api.ImportFileAsync(FilePath.Trim());
-            FilePath = string.Empty;
-            await Toast.SuccessAsync($"Importación completada: {Result?.TasksImported ?? 0} tareas en {Result?.GroupsCreated ?? 0} grupos nuevos.");
+            Validation = await Api.ValidateImportFileAsync(FilePath.Trim());
+
+            if (Validation != null && Validation.IsValid)
+            {
+                await Toast.SuccessAsync(Validation.Summary);
+            }
+        }
+        catch (Exception ex)
+        {
+            Validation = null;
+            await Toast.ErrorAsync(ex.Message);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ImportAsync()
+    {
+        Busy = true;
+        try
+        {
+            var attempt = await Api.TryImportFileAsync(FilePath.Trim());
+
+            if (!attempt.Accepted)
+            {
+                Validation = attempt.Rejection?.Validation ?? Validation;
+                await Toast.ErrorAsync(attempt.Rejection?.Message ?? "La importación fue rechazada.");
+            }
+            else
+            {
+                Result = attempt.Result;
+                FilePath = string.Empty;
+                Validation = null;
+                await Toast.SuccessAsync(
+                    $"Importación completada: {attempt.Result?.TasksImported ?? 0} tareas en {attempt.Result?.GroupsCreated ?? 0} grupos nuevos.");
+            }
+
             await LoadBatchesAsync();
         }
         catch (Exception ex)
         {
-            Result = null;
             await Toast.ErrorAsync(ex.Message);
         }
         finally

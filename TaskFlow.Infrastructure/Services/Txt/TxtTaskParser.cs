@@ -11,11 +11,16 @@ namespace TaskFlow.Infrastructure.Services.Txt;
 /// (tareas de desarrollador) o bloques "QA/Team Leade/Tasks:" (tareas globales de QA).
 /// Las tareas empiezan con número; las subtareas usan patrón "N.M-"; las líneas
 /// que empiezan con "-" continúan la descripción de la tarea anterior.
+///
+/// El parser es deliberadamente permisivo: no descarta bloques ni aborta ante líneas
+/// raras, las registra como <see cref="ImportFindingDto"/> y sigue. Así la validación
+/// puede reportar todos los problemas del archivo de una sola vez, en vez de fallar
+/// en el primero. Quien decide si el archivo se importa es ImportValidator.
 /// </summary>
 public class TxtTaskParser : ITaskFileParser
 {
     private static readonly Regex PeriodRegex =
-        new(@"^(?<month>[A-ZÁÉÍÓÚáéíóúÑñ]+\s*[A-ZÁÉÍÓÚáéíóúÑñ]*)\s+(?<year>\d{4})\s*$",
+        new(@"^(?<month>[A-Za-zÁÉÍÓÚáéíóúÑñ]+\s*[A-Za-zÁÉÍÓÚáéíóúÑñ]*)\s+(?<year>\d{4})\s*$",
             RegexOptions.Compiled);
 
     private static readonly Regex AppRegex = new(@"^\s*App\s*:\s*(?<name>.+?)\s*$", RegexOptions.Compiled);
@@ -62,25 +67,35 @@ public class TxtTaskParser : ITaskFileParser
 
         if (lineIndex < 0)
         {
-            result.Warnings.Add("El archivo está vacío.");
+            result.Findings.Add(Error(ImportFindingCode.FileEmpty, 0, 0, null, null,
+                "El archivo está vacío.",
+                "Agregue al menos la línea del periodo y un bloque de tareas."));
             return result;
         }
 
+        var periodLine = lineIndex + 1;
         var periodMatch = PeriodRegex.Match(lines[lineIndex]);
         if (!periodMatch.Success)
         {
-            result.Warnings.Add($"No se pudo interpretar el periodo en la línea 1: '{lines[lineIndex]}'.");
+            result.Findings.Add(Error(ImportFindingCode.PeriodNotParsed, periodLine, 0, null, lines[lineIndex].Trim(),
+                $"No se pudo interpretar el periodo: '{lines[lineIndex].Trim()}'.",
+                "Use el formato 'Agosto 2026' (mes en letra seguido del año)."));
             return result;
         }
 
         result.PeriodName = lines[lineIndex].Trim();
         var monthName = periodMatch.Groups["month"].Value.Trim();
         result.Year = int.Parse(periodMatch.Groups["year"].Value);
-        result.Month = Months.TryGetValue(monthName, out var m) ? m : 0;
-        if (result.Month == 0)
+
+        if (!Months.TryGetValue(monthName, out var month))
         {
-            result.Warnings.Add($"Mes no reconocido: '{monthName}'.");
+            result.Findings.Add(Error(ImportFindingCode.MonthUnknown, periodLine, 0, null, monthName,
+                $"Mes no reconocido: '{monthName}'.",
+                "Use un mes en español, por ejemplo 'Agosto 2026'."));
+            return result;
         }
+
+        result.Month = month;
 
         ParsedTaskGroupDto? current = null;
         ParsedTaskDto? lastTask = null;
@@ -94,13 +109,16 @@ public class TxtTaskParser : ITaskFileParser
                 continue;
             }
 
+            var lineNumber = i + 1;
             var line = raw.Trim();
 
             var appM = AppRegex.Match(raw);
             if (appM.Success)
             {
-                AddGroupIfPending(result, current);
-                current = new ParsedTaskGroupDto { ProjectName = appM.Groups["name"].Value.Trim() };
+                CloseGroup(result, ref current);
+                current = StartGroup(result, lineNumber);
+                current.ProjectName = appM.Groups["name"].Value.Trim();
+                current.ProjectLine = lineNumber;
                 lastTask = null;
                 capturingTasks = false;
                 continue;
@@ -109,8 +127,13 @@ public class TxtTaskParser : ITaskFileParser
             var devM = DevRegex.Match(raw);
             if (devM.Success)
             {
-                current ??= new ParsedTaskGroupDto();
+                if (current == null)
+                {
+                    current = StartGroup(result, lineNumber);
+                }
+
                 current.DevName = devM.Groups["name"].Value.Trim();
+                current.DevLine = lineNumber;
                 lastTask = null;
                 capturingTasks = false;
                 continue;
@@ -119,8 +142,13 @@ public class TxtTaskParser : ITaskFileParser
             var leadM = TeamLeadRegex.Match(raw);
             if (leadM.Success)
             {
-                current ??= new ParsedTaskGroupDto();
+                if (current == null)
+                {
+                    current = StartGroup(result, lineNumber);
+                }
+
                 current.TeamLeadName = leadM.Groups["name"].Value.Trim();
+                current.TeamLeadLine = lineNumber;
                 lastTask = null;
                 capturingTasks = false;
                 continue;
@@ -130,20 +158,25 @@ public class TxtTaskParser : ITaskFileParser
             if (qaM.Success)
             {
                 var qaName = qaM.Groups["name"].Value.Trim();
+
                 if (current != null
                     && !string.IsNullOrWhiteSpace(current.DevName)
                     && string.IsNullOrWhiteSpace(current.QaName))
                 {
                     // QA dentro de un bloque Dev.
                     current.QaName = qaName;
+                    current.QaLine = lineNumber;
                 }
                 else
                 {
                     // Inicio de bloque QA-only (o cierre del bloque anterior).
-                    AddGroupIfPending(result, current);
-                    current = new ParsedTaskGroupDto { QaName = qaName };
+                    CloseGroup(result, ref current);
+                    current = StartGroup(result, lineNumber);
+                    current.QaName = qaName;
+                    current.QaLine = lineNumber;
                     capturingTasks = false;
                 }
+
                 lastTask = null;
                 continue;
             }
@@ -157,7 +190,9 @@ public class TxtTaskParser : ITaskFileParser
 
             if (!capturingTasks || current == null)
             {
-                result.Warnings.Add($"Línea {i + 1} ignorada: '{line}'");
+                result.Findings.Add(Warning(ImportFindingCode.IgnoredLine, lineNumber, current?.Index ?? 0,
+                    null, line, $"Línea {lineNumber} ignorada: '{line}'",
+                    "Borre la línea o muévala dentro de una sección 'Tasks:'."));
                 continue;
             }
 
@@ -168,7 +203,8 @@ public class TxtTaskParser : ITaskFileParser
                 {
                     Number = int.Parse(subM.Groups["n"].Value),
                     SubNumber = int.Parse(subM.Groups["sub"].Value),
-                    Description = subM.Groups["desc"].Value.Trim()
+                    Description = subM.Groups["desc"].Value.Trim(),
+                    Line = lineNumber
                 };
                 current.Tasks.Add(lastTask);
                 continue;
@@ -181,7 +217,8 @@ public class TxtTaskParser : ITaskFileParser
                 {
                     Number = int.Parse(topM.Groups["n"].Value),
                     SubNumber = null,
-                    Description = topM.Groups["desc"].Value.Trim()
+                    Description = topM.Groups["desc"].Value.Trim(),
+                    Line = lineNumber
                 };
                 current.Tasks.Add(lastTask);
                 continue;
@@ -194,14 +231,31 @@ public class TxtTaskParser : ITaskFileParser
                 continue;
             }
 
-            result.Warnings.Add($"Línea {i + 1} no reconocida: '{line}'");
+            result.Findings.Add(Warning(ImportFindingCode.UnrecognizedLine, lineNumber, current.Index,
+                "Tasks", line,
+                $"Línea {lineNumber} no reconocida: '{line}'",
+                "Las tareas empiezan con '1.', '1.1-' o '-' para continuar la anterior."));
         }
 
-        AddGroupIfPending(result, current);
+        CloseGroup(result, ref current);
         return result;
     }
 
-    private static void AddGroupIfPending(ParsedTaskFileDto result, ParsedTaskGroupDto? group)
+    private static ParsedTaskGroupDto StartGroup(ParsedTaskFileDto result, int lineNumber)
+    {
+        return new ParsedTaskGroupDto
+        {
+            Index = result.Groups.Count + 1,
+            StartLine = lineNumber
+        };
+    }
+
+    /// <summary>
+    /// Cierra el bloque en curso y lo agrega al resultado. Antes el parser descartaba los
+    /// bloques incompletos; ahora los conserva y los marca, porque en modo estricto un
+    /// bloque sin responsables o sin tareas es un error que el usuario debe ver.
+    /// </summary>
+    private static void CloseGroup(ParsedTaskFileDto result, ref ParsedTaskGroupDto? group)
     {
         if (group == null)
         {
@@ -212,18 +266,63 @@ public class TxtTaskParser : ITaskFileParser
             && string.IsNullOrWhiteSpace(group.DevName)
             && string.IsNullOrWhiteSpace(group.QaName))
         {
-            result.Warnings.Add("Bloque incompleto descartado (sin App, Dev ni QA).");
+            result.Findings.Add(Error(ImportFindingCode.BlockWithoutOwner, group.StartLine, group.Index,
+                null, null,
+                $"Bloque {group.Index} descartado: no tiene App, Dev ni QA.",
+                "Todo bloque debe indicar al menos un proyecto o un Dev, y un responsable."));
+            group = null;
             return;
         }
 
         if (string.IsNullOrWhiteSpace(group.TeamLeadName) && string.IsNullOrWhiteSpace(group.QaName))
         {
-            result.Warnings.Add("Bloque descartado por falta de responsables (Team Lead / QA).");
+            result.Findings.Add(Error(ImportFindingCode.BlockWithoutOwner, group.StartLine, group.Index,
+                null, null,
+                $"Bloque {group.Index} descartado por falta de responsables (Team Lead / QA).",
+                "Indique al menos un Team Lead o un QA en el bloque."));
+            group = null;
             return;
         }
 
+        if (group.Tasks.Count == 0)
+        {
+            result.Findings.Add(Error(ImportFindingCode.BlockWithoutTasks, group.StartLine, group.Index,
+                "Tasks", null,
+                $"El bloque {group.Index} no tiene tareas.",
+                "Agregue al menos una tarea listada bajo 'Tasks:'."));
+        }
+
         result.Groups.Add(group);
+        group = null;
     }
+
+    private static ImportFindingDto Error(ImportFindingCode code, int line, int blockIndex = 0,
+        string? field = null, string? value = null, string message = "", string? resolution = null) =>
+        new()
+        {
+            Code = code,
+            Severity = ImportFindingSeverity.Error,
+            Line = line,
+            BlockIndex = blockIndex,
+            Field = field,
+            Value = value,
+            Message = message,
+            Resolution = resolution
+        };
+
+    private static ImportFindingDto Warning(ImportFindingCode code, int line, int blockIndex = 0,
+        string? field = null, string? value = null, string message = "", string? resolution = null) =>
+        new()
+        {
+            Code = code,
+            Severity = ImportFindingSeverity.Warning,
+            Line = line,
+            BlockIndex = blockIndex,
+            Field = field,
+            Value = value,
+            Message = message,
+            Resolution = resolution
+        };
 
     private static async Task<string> ReadAllTextWithEncodingAsync(string filePath, CancellationToken ct)
     {

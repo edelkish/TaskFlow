@@ -34,8 +34,12 @@ public class PersonRepository : GenericRepository<Person>, IPersonRepository
 
     public async Task<Person?> GetByNameCaseInsensitiveAsync(string name)
     {
+        // La columna People.Name usa la collation Latin1_General_CI_AI, así que la
+        // comparación directa ya es insensible a mayúsculas y acentos, coincide con el
+        // índice único y además es sargable. Usar ToLower() rompía esa concordancia:
+        // "José" y "Jose" no empataban en la consulta pero sí colisionaban en el índice.
         var trimmed = name.Trim();
         return await _context.People
-            .FirstOrDefaultAsync(p => p.Name.ToLower() == trimmed.ToLower());
+            .FirstOrDefaultAsync(p => p.Name == trimmed);
     }
 }

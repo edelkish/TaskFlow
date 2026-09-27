@@ -1,0 +1,35 @@
+Agosto 2026
+App: Sitio Web (UI)
+Dev: Angel
+Team Leade: Edelkis
+QA: Yidsy
+Tasks:
+1. Configurar entornos
+   1.1- Crear pipelines de build
+       - nocturno y por rama
+   1.2- Parametrizar connection strings
+2. Maquetación de pantallas
+   2.1- Layout base AdminLTE
+3. Accesibilidad
+   3.1- Contraste AA en formularios
+App: Sitio Web (API)
+Dev: Elizabeth
+Team Leade: Edelkis
+QA: Yidsy
+Tasks:
+1. Endpoints de autenticación
+   1.1- Login con JWT
+   1.2- Refresh token
+2. Migraciones EF Core
+   2.1- Script de actualización incremental
+App: Portal de Reportes
+Dev: Edelkis
+Team Leade: Miguel
+QA: Yidsy
+Tasks:
+1. Consultas base
+   1.1- Filtros por fecha y proyecto
+QA: Yidsy
+Team Leade: Edelkis
+Tasks:
+1. Pruebas globales del mes
