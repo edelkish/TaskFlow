@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace TaskFlow.Infrastructure.Migrations
+namespace TaskFlow.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
     public partial class AddPlanningStructure : Migration

@@ -1,8 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace TaskFlow.Infrastructure.Migrations
+namespace TaskFlow.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
     public partial class AddProjectVersionAndProgress : Migration
