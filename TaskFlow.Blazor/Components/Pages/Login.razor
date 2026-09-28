@@ -178,6 +178,15 @@
 
         var sw = Stopwatch.StartNew();
         Busy = true;
+
+        // Blazor solo repinta al entrar en el handler y al salir de el. Como aqui ya
+        // hubo un await antes (la validacion del formulario), el unico repintado
+        // sincrono ya ocurrio con Busy en false, y el siguiente llega con Busy en
+        // false otra vez, en el finally. Sin esta llamada el overlay y el spinner se
+        // asignan pero nunca se dibujan, y no hay ningun error en consola porque el
+        // codigo se ejecuta igual.
+        StateHasChanged();
+
         try
         {
             if (await AuthState.LoginAsync(Email.Trim(), Password))
@@ -214,6 +223,12 @@
 
         var sw = Stopwatch.StartNew();
         Busy = true;
+
+        // Ver la nota en LoginAsync: sin StateHasChanged el overlay y el spinner se
+        // asignan pero no llegan a pintarse, porque el unico repintado sincrono ya
+        // ocurrio antes de poner Busy en true.
+        StateHasChanged();
+
         try
         {
             var response = await Api.RegisterAsync(new TaskFlow.Application.DTOs.RegisterDto(Email.Trim(), Password, FullName.Trim()));
@@ -240,9 +255,8 @@
 
     /// <summary>
     /// Mantiene el overlay visible al menos <see cref="MinimumBusyMs"/> aunque la
-    /// respuesta sea inmediata. Contra la API en local la autenticacion se resuelve en
-    /// decenas de milisegundos y el indicador aparecia y desaparecia en un parpadeo que
-    /// el ojo no llega a registrar, con la sensacion de que no habia pasado nada.
+    /// respuesta sea inmediata. Sin esta espera, una autenticacion que se resuelve en
+    /// decenas de milisegundos daria la sensacion de que no ha pasado nada.
     ///
     /// La espera va antes de limpiar Busy para que el overlay siga puesto, y dentro
     /// del finally para que tambien espere cuando la operacion falla rapido: en ese
