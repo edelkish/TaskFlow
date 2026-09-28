@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TaskFlow.Application.Common;
 using TaskFlow.Domain.Entities;
 using TaskFlow.Domain.Interfaces;
 using TaskFlow.Infrastructure.Data;
@@ -104,5 +105,43 @@ public class DevGroupMemberRepository : IDevGroupMemberRepository
 
         _context.DevGroupMembers.RemoveRange(current);
         return current.Count;
+    }
+
+    public async Task<IReadOnlyList<DevGroupOwnership>> GetOwnershipsAsync(
+        IEnumerable<Guid> personIds, Guid? excludingGroupId = null)
+    {
+        var requested = personIds.Distinct().ToList();
+        if (requested.Count == 0)
+        {
+            return Array.Empty<DevGroupOwnership>();
+        }
+
+        // Se proyecta solo lo plano: PersonDisplayName.For es un metodo estatico de C# y EF
+        // no podria traducirlo a SQL, asi que el nombre completo se compone en memoria
+        // despues de traer las filas. Los alias son obligatorios porque el grupo y la
+        // persona tienen ambos una columna Name.
+        var rows = await (
+                from m in _context.DevGroupMembers
+                join g in _context.DevGroups on m.DevGroupId equals g.Id
+                join p in _context.People on m.PersonId equals p.Id
+                where requested.Contains(m.PersonId)
+                      && (excludingGroupId == null || m.DevGroupId != excludingGroupId)
+                select new
+                {
+                    m.PersonId,
+                    DevGroupId = g.Id,
+                    DevGroupName = g.Name,
+                    PersonFirstName = p.Name,
+                    PersonLastName = p.LastName
+                })
+            .ToListAsync();
+
+        return rows
+            .Select(r => new DevGroupOwnership(
+                r.PersonId,
+                PersonDisplayName.For(r.PersonFirstName, r.PersonLastName),
+                r.DevGroupId,
+                r.DevGroupName))
+            .ToList();
     }
 }

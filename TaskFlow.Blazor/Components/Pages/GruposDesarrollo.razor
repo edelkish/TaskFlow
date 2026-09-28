@@ -144,16 +144,59 @@
                                 <p class="text-secondary mb-2">
                                     Marque las personas que forman parte del grupo. La lista se reemplaza al guardar.
                                 </p>
+                                <div class="alert alert-info d-flex py-2" role="alert">
+                                    <i class="bi bi-info-circle-fill me-2"></i>
+                                    <div class="small">
+                                        Cada persona pertenece a un <strong>único</strong> grupo de desarrollo.
+                                        Las que ya están en otro grupo salen deshabilitadas: para moverlas,
+                                        quítelas antes de su grupo actual. Si alguna ya figure en este y en
+                                        otro, desmárcala aquí para dejarla solo en el suyo.
+                                    </div>
+                                </div>
                                 <div class="row">
                                     @foreach (var p in People)
                                     {
+                                        var foreign = ForeignGroupOf(p.Id);
+                                        var isCurrent = SelectedMemberIds.Contains(p.Id);
+
+                                        // Solo se bloquea a quien se PODRIA añadir. Un miembro
+                                        // actual que ademas esta en otro grupo por datos
+                                        // sucios tiene que poder quitarse, o el estado
+                                        // inconsistente quedaria sin salida: aqui no se
+                                        // puede desmarcar y en el otro grupo tampoco se
+                                        // puede marcar.
+                                        var locked = foreign != null && !isCurrent;
+
                                         <div class="col-md-3 col-sm-6">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox"
                                                        id="member-@p.Id"
-                                                       checked="@SelectedMemberIds.Contains(p.Id)"
+                                                       checked="@isCurrent"
+                                                       disabled="@locked"
                                                        @onchange="(e) => ToggleMember(p.Id, (bool?)e.Value == true)" />
-                                                <label class="form-check-label" for="member-@p.Id">@p.FullName</label>
+                                                <label class="form-check-label @(locked ? "text-secondary" : "")" for="member-@p.Id">
+                                                    @p.FullName
+                                                </label>
+                                                @* Se dice a que grupo pertenece, y no solo que esta ocupada:
+                                                   sin el nombre el usuario no sabe adonde ir a sacarla. *@
+                                                @if (foreign != null)
+                                                {
+                                                    <div class="small text-warning ms-4">
+                                                        <i class="bi bi-lock-fill me-1"></i>
+                                                        @if (isCurrent)
+                                                        {
+                                                            <span>También está en '@foreign.Value.Name'. Desmárcala para quitarla de aquí.</span>
+                                                        }
+                                                        else if (foreign.Value.Multiple)
+                                                        {
+                                                            <span>En varios grupos, entre ellos '@foreign.Value.Name'</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span>Ya está en '@foreign.Value.Name'</span>
+                                                        }
+                                                    </div>
+                                                }
                                             </div>
                                         </div>
                                     }
@@ -162,7 +205,7 @@
                                     <button class="btn btn-sm btn-primary" disabled="@Busy" @onclick="SaveMembersAsync">
                                         <i class="bi bi-check-lg me-1"></i> Guardar miembros
                                     </button>
-                                    <button class="btn btn-sm btn-secondary ms-1" @onclick="() => MembersGroup = null">Cancelar</button>
+                                    <button class="btn btn-sm btn-secondary ms-1" @onclick="CloseMembers">Cancelar</button>
                                 </div>
                             </div>
                         </div>
@@ -218,6 +261,9 @@
 
     private TaskFlow.Application.DTOs.DevGroupDto? MembersGroup { get; set; }
     private HashSet<Guid> SelectedMemberIds { get; set; } = new();
+
+    /// <summary>Persona -> (grupo al que pertenece, si esta en varios a la vez).</summary>
+    private readonly Dictionary<Guid, (string GroupName, bool Multiple)> _ownershipByPerson = new();
 
     private TaskFlow.Application.DTOs.DevGroupDto? EditGroup { get; set; }
     private string EditName { get; set; } = string.Empty;
@@ -283,10 +329,69 @@
     {
         MembersGroup = group;
         SelectedMemberIds = group.Members.Select(m => m.PersonId).ToHashSet();
+        BuildOwnershipMap(group.Id);
     }
+
+    private void CloseMembers()
+    {
+        MembersGroup = null;
+        SelectedMemberIds = new HashSet<Guid>();
+        _ownershipByPerson.Clear();
+    }
+
+    /// <summary>
+    /// Mapa persona -> grupo al que ya pertenece, excluyendo el grupo que se esta
+    /// editando para no marcar a sus miembros actuales como conflicto consigo mismos.
+    ///
+    /// La pagina ya carga los grupos con sus miembros, asi que el mapa se arma en memoria
+    /// y no hace falta ninguna peticion extra ni ensuciar PersonDto con un dato que solo
+    /// le interesa a esta vista.
+    /// </summary>
+    private void BuildOwnershipMap(Guid editingGroupId)
+    {
+        _ownershipByPerson.Clear();
+        if (Groups == null)
+        {
+            return;
+        }
+
+        foreach (var g in Groups.Where(g => g.Id != editingGroupId))
+        {
+            foreach (var m in g.Members)
+            {
+                // Si una persona estuviera en dos grupos por datos previos, se conserva el
+                // primero y se marca como conflicto multiple en lugar de ocultarlo.
+                if (!_ownershipByPerson.ContainsKey(m.PersonId))
+                {
+                    _ownershipByPerson[m.PersonId] = (g.Name, false);
+                }
+                else
+                {
+                    _ownershipByPerson[m.PersonId] = (_ownershipByPerson[m.PersonId].GroupName, true);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Grupo ajeno al que ya pertenece la persona, o null si esta libre. Se comprueba al
+    /// cambiar el checkbox ademas de deshabilitarlo, porque un formulario se puede
+    /// reenviar por teclado y saltarse el atributo disabled.
+    /// </summary>
+    private (string Name, bool Multiple)? ForeignGroupOf(Guid personId) =>
+        _ownershipByPerson.TryGetValue(personId, out var owner)
+            ? (owner.GroupName, owner.Multiple)
+            : null;
 
     private void ToggleMember(Guid personId, bool selected)
     {
+        // Regla de negocio: una persona pertenece a un unico grupo de desarrollo. El
+        // servidor la vuelve a comprobar al guardar, esto solo evita llegar hasta alla.
+        if (selected && ForeignGroupOf(personId) != null)
+        {
+            return;
+        }
+
         if (selected)
         {
             SelectedMemberIds.Add(personId);
@@ -304,12 +409,17 @@
             return;
         }
 
+        // Sin comprobacion previa de conflictos aqui a proposito. El selector ya impide
+        // anadir a quien esta en otro grupo, y si queda algun miembro inconsistente de
+        // antes lo decide el servicio, que es quien tiene los datos frescos y un mensaje
+        // mas exacto. Duplicar la regla en la UI solo anade un segundo sitio que se
+        // puede desincronizar.
         Busy = true;
         try
         {
             await Api.SetDevGroupMembersAsync(MembersGroup.Id, SelectedMemberIds.ToList());
             await Toast.SuccessAsync("Miembros actualizados.");
-            MembersGroup = null;
+            CloseMembers();
             await LoadAsync();
         }
         catch (Exception ex)

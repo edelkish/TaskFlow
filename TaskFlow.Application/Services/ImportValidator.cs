@@ -145,7 +145,9 @@ public class ImportValidator : IImportValidator
         }
 
         // Fase 4: pertenencia al grupo de desarrollo. Solo Warning, para no bloquear
-        // la planificación mensual mientras se depuran los datos.
+        // la planificación mensual mientras se depuran los datos. No contradice la regla de
+        // que una persona este en un unico grupo: alli el aviso es por curacion y aqui la
+        // asignacion en si es un error duro.
         if (project != null && project.IsActive)
         {
             blockFindings.AddRange(await ValidateDevGroupMembershipAsync(group, project,

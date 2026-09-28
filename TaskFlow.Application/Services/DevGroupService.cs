@@ -79,6 +79,14 @@ public class DevGroupService : IDevGroupService
                 $"No se encontraron estas personas: {string.Join(", ", missing)}.");
         }
 
+        // El alta acepta MemberIds aunque la interfaz hoy no los envie, asi que la puerta
+        // trasera tambien queda cubierta por la misma regla que aplica a la edicion.
+        var conflicts = await FindConflictsAsync(dto.MemberIds, excludingGroupId: null);
+        if (conflicts != null)
+        {
+            return Result<DevGroupDto>.Failure(conflicts);
+        }
+
         var group = new DevGroup
         {
             Name = trimmed,
@@ -150,10 +158,52 @@ public class DevGroupService : IDevGroupService
                 $"No se encontraron estas personas: {string.Join(", ", missing)}.");
         }
 
+        var conflicts = await FindConflictsAsync(personIds, id);
+        if (conflicts != null)
+        {
+            return Result<DevGroupDto>.Failure(conflicts);
+        }
+
         await _unitOfWork.DevGroupMembers.ReplaceMembersAsync(id, personIds);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await GetAsync(id, cancellationToken);
+    }
+
+    /// <summary>
+    /// Devuelve el texto del conflicto, o null si ninguna de esas personas pertenece a un
+    /// grupo distinto al que se esta editando.
+    ///
+    /// La regla es de servicio, no de base de datos: el indice IX_DevGroupMembers_PersonId
+    /// sigue siendo no unico a proposito, para poder revertirla sin tocar los datos si el
+    /// negocio cambia de opinion. Mientras tanto esta es la unica barrera, y la UI la
+    /// anticipa deshabilitando los checkboxes en vez de dejar que el error salte al guardar.
+    /// </summary>
+    private async Task<string?> FindConflictsAsync(IEnumerable<Guid> personIds, Guid? excludingGroupId)
+    {
+        var ownerships = await _unitOfWork.DevGroupMembers
+            .GetOwnershipsAsync(personIds, excludingGroupId);
+
+        if (ownerships.Count == 0)
+        {
+            return null;
+        }
+
+        // Una misma persona puede aparecer en varios grupos si los datos quedaron sucios
+        // antes de que existiera la regla, asi que se nombra el primero y se dice cuantos
+        // son en total, en vez de ocultarlo.
+        var details = ownerships
+            .GroupBy(o => o.PersonId)
+            .Select(g =>
+            {
+                var first = g.First();
+                return g.Count() == 1
+                    ? $"'{first.PersonName}' ya pertenece al grupo '{first.DevGroupName}'"
+                    : $"'{first.PersonName}' ya pertenece a {g.Count()} grupos, entre ellos '{first.DevGroupName}'";
+            });
+
+        return "Cada persona debe pertenecer a un único grupo de desarrollo, así que no se puede " +
+               $"asignar: {string.Join("; ", details)}.";
     }
 
     private async Task<List<string>> ResolveUnknownPeopleAsync(IEnumerable<Guid> personIds, CancellationToken cancellationToken)
