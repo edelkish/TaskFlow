@@ -54,18 +54,85 @@ h1:focus {
         content: "An error has occurred."
     }
 
-/* Cubre la pantalla mientras el login o el registro están en curso. El markup vive
-   en Login.razor y se muestra con @if (Busy), no con un onclick, para que no pueda
-   quedar visible cuando la operación ya terminó. */
-.login-overlay {
+/* Indicador de actividad del login y el registro: una barra delgada pegada al borde
+   superior. Antes era un overlay a pantalla completa con fondo negro y desenfoque, que
+   tapaba justo el formulario que el usuario está mirando mientras espera y oscurecia
+   toda la pagina, no solo el login. La barra indica lo mismo sin quitarle la vista. */
+.login-progress {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
     z-index: 9999;
-    display: flex;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+.login-progress-bar {
+    width: 40%;
+    height: 100%;
+    background-color: var(--bs-primary);
+    animation: login-progress-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes login-progress-slide {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(250%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .login-progress-bar {
+        width: 100%;
+        animation: none;
+    }
+}
+
+/* Los botones del login y el registro viven en un col-4 (~120px) junto al checkbox.
+   "Autenticando..." mas el spinner no caben ahi, y como no pueden partirse empujaban el
+   boton fuera del card. El w-100 ya fija el ancho al del col-4, de modo que el boton no
+   cambia de tamano entre estados; el overflow hidden y el text-overflow son la red de
+   seguridad para que el texto se recorte en vez de desbordar. */
+.login-btn {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(2px);
+    gap: 0.4rem;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.login-btn-spinner {
+    flex: 0 0 auto;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: login-spin 0.7s linear infinite;
+}
+
+.login-btn-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@keyframes login-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .login-btn-spinner {
+        animation: none;
+        border-top-color: currentColor;
+    }
 }
 
 .darker-border-checkbox.form-check-input {
