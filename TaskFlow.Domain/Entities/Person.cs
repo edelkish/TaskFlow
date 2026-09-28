@@ -8,6 +8,19 @@ public class Person : BaseEntity
 {
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Apellidos. Opcional: el TXT de planificacion solo trae un token por persona, asi
+    /// que hay altas y filas historicas sin apellidos.
+    /// </summary>
+    public string? LastName { get; set; }
+
+    /// <summary>
+    /// Usuario corporativo de la persona. Opcional, y distinto de <see cref="UserId"/>:
+    /// este es el login legible que aparece en la interfaz, aquel es el GUID de
+    /// AspNetUsers con el que se vincula al login de Identity.
+    /// </summary>
+    public string? UserName { get; set; }
+
     /// <summary>Identificador del usuario Identity vinculado (AspNetUsers.Id).</summary>
     public string? UserId { get; set; }
 
