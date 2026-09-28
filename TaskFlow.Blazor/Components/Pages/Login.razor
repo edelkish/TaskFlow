@@ -1,6 +1,7 @@
 @page "/"
 @page "/login"
 @layout AuthLayout
+@using System.Diagnostics
 @inject TaskFlow.Blazor.Services.AuthState AuthState
 @inject TaskFlow.Blazor.Services.ApiClient Api
 @inject TaskFlow.Blazor.Services.ToastService Toast
@@ -148,6 +149,9 @@
 }
 
 @code {
+    // Instancia minima del overlay de carga. Ver WaitForMinimumAsync.
+    private const int MinimumBusyMs = 400;
+
     private ElementReference _loginForm;
     private ElementReference _registerForm;
 
@@ -159,11 +163,20 @@
 
     private async Task LoginAsync()
     {
+        // El boton queda deshabilitado mientras Busy es true, pero eso no impide
+        // pulsar Enter en el campo del correo, que dispara el submit otra vez y
+        // mandaria un segundo POST a la API.
+        if (Busy)
+        {
+            return;
+        }
+
         if (!await Toast.ValidateFormAsync(_loginForm))
         {
             return;
         }
 
+        var sw = Stopwatch.StartNew();
         Busy = true;
         try
         {
@@ -182,17 +195,24 @@
         }
         finally
         {
+            await WaitForMinimumAsync(sw);
             Busy = false;
         }
     }
 
     private async Task RegisterAsync()
     {
+        if (Busy)
+        {
+            return;
+        }
+
         if (!await Toast.ValidateFormAsync(_registerForm))
         {
             return;
         }
 
+        var sw = Stopwatch.StartNew();
         Busy = true;
         try
         {
@@ -213,7 +233,24 @@
         }
         finally
         {
+            await WaitForMinimumAsync(sw);
             Busy = false;
         }
+    }
+
+    /// <summary>
+    /// Mantiene el overlay visible al menos <see cref="MinimumBusyMs"/> aunque la
+    /// respuesta sea inmediata. Contra la API en local la autenticacion se resuelve en
+    /// decenas de milisegundos y el indicador aparecia y desaparecia en un parpadeo que
+    /// el ojo no llega a registrar, con la sensacion de que no habia pasado nada.
+    ///
+    /// La espera va antes de limpiar Busy para que el overlay siga puesto, y dentro
+    /// del finally para que tambien espere cuando la operacion falla rapido: en ese
+    /// caso es el toast de error el que debe verse sin que lo tape el overlay.
+    /// </summary>
+    private static Task WaitForMinimumAsync(Stopwatch elapsed)
+    {
+        var remaining = MinimumBusyMs - (int)elapsed.ElapsedMilliseconds;
+        return remaining > 0 ? Task.Delay(remaining) : Task.CompletedTask;
     }
 }
