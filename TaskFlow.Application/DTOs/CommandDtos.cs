@@ -52,12 +52,16 @@ public record CreatePeriodDto
 public record CreatePersonDto
 {
     public string Name { get; init; } = string.Empty;
+    public string? LastName { get; init; }
+    public string? UserName { get; init; }
     public string? UserId { get; init; }
 }
 
 public record UpdatePersonDto
 {
     public string Name { get; init; } = string.Empty;
+    public string? LastName { get; init; }
+    public string? UserName { get; init; }
     public string? UserId { get; init; }
 }
 

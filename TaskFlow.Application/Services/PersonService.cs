@@ -29,7 +29,16 @@ public class PersonService : IPersonService
     {
         var people = await _unitOfWork.People.GetAllAsync();
         var dtos = await MapWithRolesAsync(people, ct);
-        return Result<IEnumerable<PersonDto>>.Success(dtos);
+
+        // El listado de personas se ordena por apellido y luego por nombre. El orden se
+        // aplica sobre los DTO ya mapeados, que es donde se conoce el nombre completo,
+        // para no dejar personas sin apellidos agrupadas aparte.
+        var ordered = dtos
+            .OrderBy(p => p.LastName ?? string.Empty, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        return Result<IEnumerable<PersonDto>>.Success(ordered);
     }
 
     public async Task<Result<PersonDto>> GetAsync(Guid id, CancellationToken ct = default)
@@ -112,13 +121,22 @@ public class PersonService : IPersonService
         if (!validation.IsValid)
             return Result<PersonDto>.Failure(validation.ToString());
 
-        var existing = await _unitOfWork.People.GetByNameCaseInsensitiveAsync(dto.Name.Trim());
-        if (existing != null)
-            return Result<PersonDto>.Failure($"Ya existe una persona con el nombre '{dto.Name.Trim()}'.");
+        var lastName = Normalize(dto.LastName);
+        var userName = Normalize(dto.UserName);
+
+        var duplicate = await _unitOfWork.People.ExistsWithNameAndLastNameAsync(dto.Name, lastName);
+        if (duplicate)
+            return Result<PersonDto>.Failure(AlreadyExistsMessage(dto.Name, lastName));
+
+        var userNameTaken = await _unitOfWork.People.ExistsWithUserNameAsync(userName);
+        if (userNameTaken)
+            return Result<PersonDto>.Failure($"El usuario '{userName}' ya está asignado a otra persona.");
 
         var person = new Person
         {
             Name = dto.Name.Trim(),
+            LastName = lastName,
+            UserName = userName,
             UserId = dto.UserId,
             IsActive = true
         };
@@ -139,7 +157,33 @@ public class PersonService : IPersonService
         if (person == null)
             return Result<PersonDto>.Failure("Persona no encontrada.");
 
+        var lastName = Normalize(dto.LastName);
+        var userName = Normalize(dto.UserName);
+
+        // La edición también comprueba la unicidad del par. Antes no lo hacía y se
+        // apoyaba solo en el índice único de la BD, que devolvía un 500 en vez de un
+        // mensaje de validación; ahora la regla es el par (Apellidos, Nombre) y un
+        // mensaje de error es mucho más útil que una excepción.
+        //
+        // Solo se consulta si el valor cambia, para no rechazar el guardado de una persona
+        // que ya cumple la regla y solo esta cambiando otra cosa.
+        if (lastName != person.LastName)
+        {
+            var duplicate = await _unitOfWork.People.ExistsWithNameAndLastNameAsync(dto.Name, lastName);
+            if (duplicate)
+                return Result<PersonDto>.Failure(AlreadyExistsMessage(dto.Name, lastName));
+        }
+
+        if (userName != person.UserName)
+        {
+            var userNameTaken = await _unitOfWork.People.ExistsWithUserNameAsync(userName, id);
+            if (userNameTaken)
+                return Result<PersonDto>.Failure($"El usuario '{userName}' ya está asignado a otra persona.");
+        }
+
         person.Name = dto.Name.Trim();
+        person.LastName = lastName;
+        person.UserName = userName;
         person.UserId = dto.UserId;
         person.UpdatedAt = DateTime.UtcNow;
 
@@ -161,4 +205,17 @@ public class PersonService : IPersonService
         await _unitOfWork.SaveChangesAsync(ct);
         return Result<bool>.Success(true);
     }
+
+    /// <summary>
+    /// Normaliza un campo opcional de texto: si viene vacio o con solo espacios se guarda
+    /// como NULL y no como cadena en blanco, porque un espacio no es un apellido valido y
+    /// un NULL si es comparable con el indice unico.
+    /// </summary>
+    private static string? Normalize(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string AlreadyExistsMessage(string name, string? lastName) =>
+        string.IsNullOrEmpty(lastName)
+            ? $"Ya existe una persona con el nombre '{name.Trim()}' sin apellidos."
+            : $"Ya existe una persona con el nombre '{name.Trim()}' y los apellidos '{lastName}'.";
 }

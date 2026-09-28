@@ -1,3 +1,4 @@
+using TaskFlow.Application.Common;
 using TaskFlow.Domain.Enums;
 
 namespace TaskFlow.Application.DTOs;
@@ -14,7 +15,13 @@ public record PersonDto
 {
     public Guid Id { get; init; }
     public string Name { get; init; } = string.Empty;
+    public string? LastName { get; init; }
+    public string? UserName { get; init; }
     public string? UserId { get; init; }
+
+    /// <summary>Nombre y apellidos juntos, para mostrarlos en listas y selectores.</summary>
+    public string FullName => PersonDisplayName.For(Name, LastName);
+
     public List<string> Roles { get; init; } = new();
     public List<Guid> RoleIds { get; init; } = new();
 }

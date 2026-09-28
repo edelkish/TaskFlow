@@ -31,6 +31,13 @@ public enum ImportFindingCode
     MissingRole,
 
     /// <summary>
+    /// El nombre del TXT corresponde a más de una persona. Desde que la identidad de una
+    /// persona es el par (Apellidos, Nombre) y no el nombre solo, pueden existir homónimos.
+    /// Error, no warning: elegir una sería asignar el bloque a la persona equivocada.
+    /// </summary>
+    PersonAmbiguous,
+
+    /// <summary>
     /// El Dev o el QA del bloque no pertenece al grupo de desarrollo del proyecto.
     /// Warning, no error: la pertenencia se está depurando y no debe frenar la
     /// planificación mensual.

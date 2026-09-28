@@ -1,3 +1,4 @@
+using TaskFlow.Application.Common;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Domain.Entities;
@@ -42,7 +43,12 @@ public class ImportValidator : IImportValidator
         // Los cargos se resuelven una vez y se reutilizan en todos los bloques.
         var cargos = await LoadRequiredRolesAsync(cancellationToken);
         var blocks = new List<ImportBlockPreviewDto>();
-        var personCache = new Dictionary<string, Person?>(StringComparer.OrdinalIgnoreCase);
+
+        // El nombre de una persona ya no es único: la clave real es (Apellidos, Nombre).
+        // Por eso la caché guarda la lista de coincidencias y no una persona, para poder
+        // distinguir "no existe" de "existen varias" y reportar la ambigüedad en vez de
+        // elegir una al azar y asignarle el bloque.
+        var personCache = new Dictionary<string, List<Person>>(StringComparer.OrdinalIgnoreCase);
         var projectCache = new Dictionary<string, Project?>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var group in parsed.Groups)
@@ -75,7 +81,7 @@ public class ImportValidator : IImportValidator
     private async Task<ImportBlockPreviewDto> ValidateBlockAsync(
         ParsedTaskGroupDto group,
         IReadOnlyDictionary<string, Role?> cargos,
-        Dictionary<string, Person?> personCache,
+        Dictionary<string, List<Person>> personCache,
         Dictionary<string, Project?> projectCache,
         CancellationToken cancellationToken)
     {
@@ -169,7 +175,7 @@ public class ImportValidator : IImportValidator
     private async Task<List<ImportFindingDto>> ValidateDevGroupMembershipAsync(
         ParsedTaskGroupDto group,
         Project project,
-        Dictionary<string, Person?> personCache,
+        Dictionary<string, List<Person>> personCache,
         CancellationToken cancellationToken)
     {
         var result = new List<ImportFindingDto>();
@@ -200,21 +206,25 @@ public class ImportValidator : IImportValidator
         HashSet<Guid> memberIds,
         string groupName,
         List<ImportFindingDto> target,
-        Dictionary<string, Person?> personCache)
+        Dictionary<string, List<Person>> personCache)
     {
         if (string.IsNullOrWhiteSpace(rawName)) return;
 
         var name = rawName.Trim();
 
-        if (!personCache.TryGetValue(name, out var person))
+        if (!personCache.TryGetValue(name, out var matches))
         {
-            person = await _unitOfWork.People.GetByNameCaseInsensitiveAsync(name);
-            personCache[name] = person;
+            matches = (await _unitOfWork.People.GetAllByNameCaseInsensitiveAsync(name)).ToList();
+            personCache[name] = matches;
         }
 
-        // Si la persona no existe o no tiene el cargo, ya hay un error bloqueante: no
-        // se agrega ruido con un warning derivado.
-        if (person == null || !person.IsActive) return;
+        // Si la persona no existe, está inactiva o el nombre es ambiguo, ya hay un error
+        // bloqueante reportado por ValidatePersonAsync: no se agrega ruido con un warning
+        // derivado. Con varias coincidencias no se puede evaluar la pertenencia.
+        if (matches.Count != 1) return;
+
+        var person = matches[0];
+        if (!person.IsActive) return;
 
         if (memberIds.Contains(person.Id)) return;
 
@@ -236,24 +246,41 @@ public class ImportValidator : IImportValidator
         string rawName,
         int line,
         IReadOnlyDictionary<string, Role?> cargos,
-        Dictionary<string, Person?> personCache,
+        Dictionary<string, List<Person>> personCache,
         CancellationToken cancellationToken)
     {
         var name = rawName.Trim();
 
-        if (!personCache.TryGetValue(name, out var person))
+        if (!personCache.TryGetValue(name, out var matches))
         {
-            person = await _unitOfWork.People.GetByNameCaseInsensitiveAsync(name);
-            personCache[name] = person;
+            matches = (await _unitOfWork.People.GetAllByNameCaseInsensitiveAsync(name)).ToList();
+            personCache[name] = matches;
         }
 
-        if (person == null)
+        if (matches.Count == 0)
         {
             return Error(
                 ImportFindingCode.PersonNotFound, line, group.Index, cargo, name,
                 $"Bloque {group.Index}: la persona '{name}' ({cargo}) no existe.",
                 $"Cree a '{name}' en Personas antes de importar.");
         }
+
+        // El TXT solo trae un token por persona, así que si ese nombre corresponde a varias
+        // personas no hay forma de saber a cuál pertenece el bloque. Es un error bloqueante
+        // porque adivinar asignaría el trabajo a la persona equivocada.
+        if (matches.Count > 1)
+        {
+            var candidates = string.Join(", ", matches
+                .Select(m => PersonDisplayName.For(m.Name, m.LastName)));
+
+            return Error(
+                ImportFindingCode.PersonAmbiguous, line, group.Index, cargo, name,
+                $"Bloque {group.Index}: '{name}' ({cargo}) corresponde a {matches.Count} personas: {candidates}.",
+                $"El TXT solo admite un nombre por persona, así que no puede elegir entre ellas. "
+                + $"Distingalas en Personas con un nombre propio, o edite el bloque para que apunte a una sola.");
+        }
+
+        var person = matches[0];
 
         if (!person.IsActive)
         {

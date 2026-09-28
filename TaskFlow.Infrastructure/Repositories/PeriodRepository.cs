@@ -32,13 +32,6 @@ public class PersonRepository : GenericRepository<Person>, IPersonRepository
     {
     }
 
-    public async Task<Person?> GetByNameCaseInsensitiveAsync(string name)
-    {
-        var trimmed = name.Trim();
-        return await _context.People
-            .FirstOrDefaultAsync(p => p.Name == trimmed);
-    }
-
     public async Task<IReadOnlyList<Person>> GetAllByNameCaseInsensitiveAsync(string name)
     {
         // La columna People.Name usa la collation Latin1_General_CI_AI, así que la

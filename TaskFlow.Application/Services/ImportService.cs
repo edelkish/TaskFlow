@@ -1,4 +1,5 @@
 using AutoMapper;
+using TaskFlow.Application.Common;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Domain.Entities;
@@ -250,7 +251,23 @@ public class ImportService : IImportService
             return null;
         }
 
-        return await _unitOfWork.People.GetByNameCaseInsensitiveAsync(name.Trim());
+        var matches = await _unitOfWork.People.GetAllByNameCaseInsensitiveAsync(name.Trim());
+
+        // La validación previa ya bloquea el archivo ante nombres ambiguos, así que llegar
+        // aquí con más de una coincidencia significa que se saltó esa validación. Se lanza
+        // una excepción en vez de escoger la primera porque la importación es todo-o-nada:
+        // asignar el bloque a una persona arbitraria sería peor que fallar.
+        if (matches.Count > 1)
+        {
+            var candidates = string.Join(", ", matches
+                .Select(m => PersonDisplayName.For(m.Name, m.LastName)));
+
+            throw new InvalidOperationException(
+                $"La persona '{name.Trim()}' es ambigua: corresponde a {matches.Count} personas ({candidates}). "
+                + "La importación debe pasar antes por la validación.");
+        }
+
+        return matches.Count == 0 ? null : matches[0];
     }
 
     private static string Summarize(IEnumerable<ImportFindingDto> findings)

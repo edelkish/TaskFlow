@@ -52,7 +52,7 @@ public class DevGroupService : IDevGroupService
             IsActive = group.IsActive,
             MemberCount = withMembers?.Members.Count ?? 0,
             Members = withMembers?.Members
-                .Select(m => new DevGroupMemberDto { PersonId = m.PersonId, PersonName = m.Person.Name })
+                .Select(m => new DevGroupMemberDto { PersonId = m.PersonId, PersonName = PersonDisplayName.For(m.Person.Name, m.Person.LastName) })
                 .OrderBy(m => m.PersonName)
                 .ToList() ?? new List<DevGroupMemberDto>()
         };
@@ -185,7 +185,7 @@ public class DevGroupService : IDevGroupService
             MemberCount = memberIds.Count,
             ProjectCount = projects,
             Members = people
-                .Select(p => new DevGroupMemberDto { PersonId = p.Id, PersonName = p.Name })
+                .Select(p => new DevGroupMemberDto { PersonId = p.Id, PersonName = PersonDisplayName.For(p.Name, p.LastName) })
                 .OrderBy(m => m.PersonName)
                 .ToList()
         };

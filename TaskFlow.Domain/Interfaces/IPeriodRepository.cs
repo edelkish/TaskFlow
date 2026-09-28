@@ -15,7 +15,6 @@ public interface IPersonRepository : IGenericRepository<Person>
     /// Puede devolver mas de una: el nombre ya no es clave unica y quien llama debe
     /// detectar la ambiguedad en lugar de quedarse con la primera.
     /// </summary>
-    Task<Person?> GetByNameCaseInsensitiveAsync(string name);
     Task<IReadOnlyList<Person>> GetAllByNameCaseInsensitiveAsync(string name);
 
     /// <summary>Indica si ya existe una persona con ese nombre y apellidos.</summary>

@@ -1,4 +1,5 @@
 using AutoMapper;
+using TaskFlow.Application.Common;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Domain.Entities;
 
@@ -19,9 +20,12 @@ public class MappingProfile : Profile
 
         CreateMap<Period, PeriodDto>();
 
+        // LastName y UserName se mapean por convención al tener el mismo nombre. FullName es
+        // una propiedad calculada del record, se ignora para que no intente asignarla.
         CreateMap<Person, PersonDto>()
             .ForMember(dest => dest.Roles, opt => opt.Ignore())
-            .ForMember(dest => dest.RoleIds, opt => opt.Ignore());
+            .ForMember(dest => dest.RoleIds, opt => opt.Ignore())
+            .ForMember(dest => dest.FullName, opt => opt.Ignore());
 
         CreateMap<Role, RoleDto>();
 
@@ -34,11 +38,17 @@ public class MappingProfile : Profile
         CreateMap<TaskGroup, TaskGroupDto>()
             .ForMember(dest => dest.PeriodName, opt => opt.MapFrom(src => src.Period.Name))
             .ForMember(dest => dest.ProjectName, opt => opt.MapFrom(src => src.Project != null ? src.Project.Name : null))
-            .ForMember(dest => dest.DevName, opt => opt.MapFrom(src => src.DevPerson != null ? src.DevPerson.Name : null))
-            .ForMember(dest => dest.TeamLeadName, opt => opt.MapFrom(src => src.TeamLeadPerson != null ? src.TeamLeadPerson.Name : null))
-            .ForMember(dest => dest.QaName, opt => opt.MapFrom(src => src.QaPerson != null ? src.QaPerson.Name : null));
+            // Nombre y apellidos juntos: puede haber homonimos, asi que con el nombre solo
+            // no se distingue a una persona de otra en la lista ni en el selector.
+            .ForMember(dest => dest.DevName, opt => opt.MapFrom(src =>
+                src.DevPerson != null ? PersonDisplayName.For(src.DevPerson.Name, src.DevPerson.LastName) : null))
+            .ForMember(dest => dest.TeamLeadName, opt => opt.MapFrom(src =>
+                src.TeamLeadPerson != null ? PersonDisplayName.For(src.TeamLeadPerson.Name, src.TeamLeadPerson.LastName) : null))
+            .ForMember(dest => dest.QaName, opt => opt.MapFrom(src =>
+                src.QaPerson != null ? PersonDisplayName.For(src.QaPerson.Name, src.QaPerson.LastName) : null));
 
         CreateMap<PlanningTask, PlanningTaskDto>()
-            .ForMember(dest => dest.AssignedPersonName, opt => opt.MapFrom(src => src.AssignedPerson != null ? src.AssignedPerson.Name : null));
+            .ForMember(dest => dest.AssignedPersonName, opt => opt.MapFrom(src =>
+                src.AssignedPerson != null ? PersonDisplayName.For(src.AssignedPerson.Name, src.AssignedPerson.LastName) : null));
     }
 }
