@@ -4,6 +4,10 @@ namespace TaskFlow.Application.Validators;
 
 public class CreatePeriodValidator : AbstractValidator<DTOs.CreatePeriodDto>
 {
+    // El maximo es 60 porque es lo que declara PeriodConfiguration para la columna. Con
+    // 100 la validacion dejaba pasar nombres que despues reventaban en SQL al truncar.
+    public const int MaxNameLength = 60;
+
     public CreatePeriodValidator()
     {
         RuleFor(x => x.Year)
@@ -14,7 +18,18 @@ public class CreatePeriodValidator : AbstractValidator<DTOs.CreatePeriodDto>
 
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("El nombre del periodo es obligatorio.")
-            .MaximumLength(100).WithMessage("El nombre no debe exceder los 100 caracteres.");
+            .MaximumLength(MaxNameLength).WithMessage($"El nombre no debe exceder los {MaxNameLength} caracteres.");
+    }
+}
+
+public class UpdatePeriodValidator : AbstractValidator<DTOs.UpdatePeriodDto>
+{
+    public UpdatePeriodValidator()
+    {
+        RuleFor(x => x.Name)
+            .NotEmpty().WithMessage("El nombre del periodo es obligatorio.")
+            .MaximumLength(CreatePeriodValidator.MaxNameLength)
+            .WithMessage($"El nombre no debe exceder los {CreatePeriodValidator.MaxNameLength} caracteres.");
     }
 }
 

@@ -32,6 +32,16 @@ public interface IPeriodService
     Task<Result<IEnumerable<PeriodDto>>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<Result<PeriodDto>> GetAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Result<PeriodDto>> CreateAsync(CreatePeriodDto dto, CancellationToken cancellationToken = default);
+
+    /// <summary>Solo cambia el nombre: el anio y el mes son la identidad del periodo.</summary>
+    Task<Result<PeriodDto>> UpdateAsync(Guid id, UpdatePeriodDto dto, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Falla si el periodo tiene grupos de tareas o importaciones asociadas. No hay
+    /// borrado en cascada: reubicar el contenido es una decision del usuario, no un
+    /// efecto secundario de eliminar un mes.
+    /// </summary>
+    Task<Result<bool>> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }
 
 public interface IPersonService

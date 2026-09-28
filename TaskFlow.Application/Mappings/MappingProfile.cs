@@ -18,7 +18,11 @@ public class MappingProfile : Profile
         CreateMap<CreateProjectDto, Project>();
         CreateMap<UpdateProjectDto, Project>();
 
-        CreateMap<Period, PeriodDto>();
+        // Los contadores no se mapean solos porque son colecciones y no propiedades
+        // escalares; el repositorio las carga incluidas y aqui se mide su tamano.
+        CreateMap<Period, PeriodDto>()
+            .ForMember(d => d.GroupCount, o => o.MapFrom(s => s.TaskGroups.Count))
+            .ForMember(d => d.ImportCount, o => o.MapFrom(s => s.ImportBatches.Count));
 
         // LastName y UserName se mapean por convención al tener el mismo nombre. FullName es
         // una propiedad calculada del record, se ignora para que no intente asignarla.

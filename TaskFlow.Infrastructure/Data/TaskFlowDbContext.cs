@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using TaskFlow.Domain.Entities;
+using TaskFlow.Domain.Exceptions;
 
 namespace TaskFlow.Infrastructure.Data;
 
@@ -43,6 +44,31 @@ public class TaskFlowDbContext : IdentityDbContext
             }
         }
 
-        return await base.SaveChangesAsync(cancellationToken);
+        try
+        {
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsForeignKeyViolation(ex))
+        {
+            // Se traduce aqui, en SaveChangesAsync, y no en cada servicio, porque es el unico
+            // punto por el que pasan todas las escrituras. La capa Application no conoce EF,
+            // asi que es el lugar natural para convertir el fallo de la base en algo que el
+            // middleware ya sabe responder con 400 y un mensaje util.
+            //
+            // El mensaje no puede decir que registro concreto estorba sin inventarse el
+            // nombre de la FK, pero si dice lo accionable: hay datos dependientes.
+            throw new DomainException(
+                "No se puede completar la operacion porque el registro tiene datos asociados. " +
+                "Elimine primero los registros dependientes e intentelo de nuevo.",
+                ex);
+        }
     }
+
+    /// <summary>
+    /// 547 es el numero de error de SQL Server para una violacion de clave foranea. Se
+    /// distingue de otros fallos de DbUpdateException (unicidad, required) para no
+    /// enmascararlos con un mensaje que no corresponde.
+    /// </summary>
+    private static bool IsForeignKeyViolation(DbUpdateException ex) =>
+        ex.InnerException is Microsoft.Data.SqlClient.SqlException { Number: 547 };
 }

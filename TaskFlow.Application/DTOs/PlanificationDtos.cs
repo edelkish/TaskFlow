@@ -9,6 +9,14 @@ public record PeriodDto
     public int Year { get; init; }
     public int Month { get; init; }
     public string Name { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Contenido que impide eliminar el periodo. Se muestran en la tabla para que se vea
+    /// de un vistazo que periodos estan vacios y por tanto si se pueden borrar.
+    /// </summary>
+    public int GroupCount { get; init; }
+
+    public int ImportCount { get; init; }
 }
 
 public record PersonDto

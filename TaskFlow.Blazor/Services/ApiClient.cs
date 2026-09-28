@@ -26,11 +26,33 @@ public class ApiClient
 
         var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         var statusCode = (int)response.StatusCode;
-        var message = string.IsNullOrWhiteSpace(body)
+
+        // Los controllers devuelven BadRequest(result.Error), y al ser un string el
+        // serializador lo envuelve como literal JSON: el cuerpo llega como
+        // "\"No se puede eliminar...\"" con comillas. Se desenvuelve para que en el toast
+        // se lea la frase, y solo se antepone el codigo cuando no hay mensaje que mostrar.
+        var detail = TryUnwrapJsonString(body) ?? body.Trim();
+        var message = string.IsNullOrWhiteSpace(detail)
             ? $"HTTP {statusCode}"
-            : $"HTTP {statusCode}: {body.Trim()}";
+            : detail;
 
         throw new HttpRequestException(message);
+    }
+
+    private static string? TryUnwrapJsonString(string body)
+    {
+        var trimmed = body.Trim();
+        if (trimmed.Length < 2 || trimmed[0] != '"' || trimmed[^1] != '"')
+            return null;
+
+        try
+        {
+            return JsonSerializer.Deserialize<string>(trimmed);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     // Auth
@@ -130,6 +152,19 @@ public class ApiClient
         var response = await _httpClient.PostAsJsonAsync("api/periods", dto);
         response = await EnsureSuccessAsync(response);
         return await response.Content.ReadFromJsonAsync<PeriodDto>(_jsonOptions);
+    }
+
+    public async Task<PeriodDto?> UpdatePeriodAsync(Guid id, UpdatePeriodDto dto)
+    {
+        var response = await _httpClient.PutAsJsonAsync($"api/periods/{id}", dto);
+        response = await EnsureSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<PeriodDto>(_jsonOptions);
+    }
+
+    public async Task DeletePeriodAsync(Guid id)
+    {
+        var response = await _httpClient.DeleteAsync($"api/periods/{id}");
+        await EnsureSuccessAsync(response);
     }
 
     // Grupos de tareas

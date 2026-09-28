@@ -56,6 +56,11 @@
                                 <th>Periodo</th>
                                 <th>Año</th>
                                 <th>Mes</th>
+                                @* Los conteos van visibles para que se vea de un vistazo que periodos
+                                   estan vacios y por tanto se pueden borrar, y cuales tienen contenido
+                                   y habria que vaciar antes. *@
+                                <th class="text-center">Grupos</th>
+                                <th class="text-center">Importaciones</th>
                                 @* Solo navegación de lectura, visible para todos los roles. *@
                                 <th class="text-end">Acciones</th>
                             </tr>
@@ -63,7 +68,7 @@
                         <tbody>
                             @if (Periods == null || Periods.Count == 0)
                             {
-                                <tr><td colspan="4" class="text-center text-secondary">No hay periodos creados.</td></tr>
+                                <tr><td colspan="6" class="text-center text-secondary">No hay periodos creados.</td></tr>
                             }
                             else
                             {
@@ -73,10 +78,21 @@
                                         <td>@p.Name</td>
                                         <td>@p.Year</td>
                                         <td>@(new System.Globalization.CultureInfo("es-ES").DateTimeFormat.GetMonthName(p.Month))</td>
-                                        <td class="text-end">
+                                        <td class="text-center">@p.GroupCount</td>
+                                        <td class="text-center">@p.ImportCount</td>
+                                        <td class="text-end text-nowrap">
                                             <a class="btn btn-sm btn-outline-primary" href="grupos?periodo=@p.Id">
                                                 <i class="bi bi-diagram-3 me-1"></i> Grupos
                                             </a>
+                                            @if (AuthState.CanEditMasterData)
+                                            {
+                                                <button class="btn btn-sm btn-outline-secondary" title="Editar nombre" @onclick="() => OpenEdit(p)">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger" title="Eliminar" @onclick="() => OpenDelete(p)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            }
                                         </td>
                                     </tr>
                                 }
@@ -90,14 +106,109 @@
     </div>
 </div>
 
+@if (EditPeriod != null)
+{
+    <div class="row">
+        <div class="col-12">
+            @* Edicion en linea, el mismo patron que ya usan Grupos y GruposDesarrollo. *@
+            <div class="card card-outline card-warning">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Editar <strong>@EditPeriod.Name</strong></h6>
+                </div>
+                <div class="card-body">
+                    <form class="needs-validation" novalidate @ref="_editForm" @onsubmit="SaveEditAsync" @onsubmit:preventDefault>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre</label>
+                                <input type="text" class="form-control" maxlength="60" required @bind="EditName" />
+                                <div class="invalid-feedback">Indique un nombre (máximo 60 caracteres).</div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label d-block">Año y mes</label>
+                                @* No editables: son la identidad del periodo y sus grupos y tareas
+                                   cuelgan de ella. Moverlos reubicaria el contenido de un mes a
+                                   otro. Si el mes esta equivocado se corrige borrando el periodo
+                                   y creandolo de nuevo. *@
+                                <input type="text" class="form-control" disabled value="@EditMonthAndYear" />
+                            </div>
+                            <div class="col-md-3">
+                                <button type="submit" class="btn btn-primary w-100" disabled="@Busy">
+                                    <i class="bi bi-check-lg me-1"></i> Guardar
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-sm btn-secondary" @onclick="CloseEdit">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<ConfirmDialog Show="@(PeriodToDelete != null)"
+               Title="Eliminar periodo"
+               Icon="bi-exclamation-triangle"
+               Message="@DeleteMessage"
+               BlockingText="@DeleteBlocking"
+               ConfirmText="Eliminar"
+               Busy="@Busy"
+               OnConfirm="ConfirmDeleteAsync"
+               OnCancel="CloseDelete" />
+
 @code {
     private ElementReference _createForm;
+    private ElementReference _editForm;
 
     private int NewYear { get; set; } = DateTime.Today.Year;
     private int NewMonth { get; set; } = DateTime.Today.Month;
     private string NewName { get; set; } = string.Empty;
     private bool Busy { get; set; }
     private List<TaskFlow.Application.DTOs.PeriodDto>? Periods { get; set; }
+
+    private TaskFlow.Application.DTOs.PeriodDto? EditPeriod { get; set; }
+    private string EditName { get; set; } = string.Empty;
+
+    private TaskFlow.Application.DTOs.PeriodDto? PeriodToDelete { get; set; }
+
+    private string? DeleteMessage => PeriodToDelete == null
+        ? null
+        : $"Va a eliminar '{PeriodToDelete.Name}'. Esta accion no se puede deshacer.";
+
+    /// <summary>
+    /// Va en una propiedad y no en linea en el atributo porque Razor cierra el atributo en la
+    /// primera comilla doble, y el nombre del mes se obtiene con "es-ES" entrecomillado.
+    /// </summary>
+    private string EditMonthAndYear => EditPeriod == null
+        ? string.Empty
+        : $"{new System.Globalization.CultureInfo("es-ES").DateTimeFormat.GetMonthName(EditPeriod.Month)} {EditPeriod.Year}";
+
+    /// <summary>
+    /// Motivo del bloqueo. Es solo la prevencion: la comprobacion que manda es la del
+    /// servidor, porque los conteos de la tabla pueden quedarse viejos si alguien importa
+    /// un TXT en otra pestana mientras este dialogo esta abierto.
+    /// </summary>
+    private string? DeleteBlocking
+    {
+        get
+        {
+            if (PeriodToDelete == null)
+            {
+                return null;
+            }
+
+            if (PeriodToDelete.GroupCount == 0 && PeriodToDelete.ImportCount == 0)
+            {
+                return null;
+            }
+
+            return $"Este periodo tiene {Plural("grupo de tareas", "grupos de tareas", PeriodToDelete.GroupCount)} " +
+                   $"y {Plural("importación", "importaciones", PeriodToDelete.ImportCount)}. " +
+                   "No se puede eliminar un periodo con contenido asociado, y vaciarlo antes eliminaria " +
+                   "el historico de planificacion de ese mes.";
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -155,4 +266,89 @@
             Busy = false;
         }
     }
+
+    private void OpenEdit(TaskFlow.Application.DTOs.PeriodDto period)
+    {
+        EditPeriod = period;
+        EditName = period.Name;
+    }
+
+    private void CloseEdit()
+    {
+        EditPeriod = null;
+        EditName = string.Empty;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        if (EditPeriod == null)
+        {
+            return;
+        }
+
+        if (!await Toast.ValidateFormAsync(_editForm))
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            await Api.UpdatePeriodAsync(EditPeriod.Id, new TaskFlow.Application.DTOs.UpdatePeriodDto
+            {
+                Name = EditName.Trim()
+            });
+            await Toast.SuccessAsync("Periodo actualizado.");
+            CloseEdit();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await Toast.ErrorAsync(ex.Message);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void OpenDelete(TaskFlow.Application.DTOs.PeriodDto period)
+    {
+        PeriodToDelete = period;
+    }
+
+    private void CloseDelete()
+    {
+        PeriodToDelete = null;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (PeriodToDelete == null)
+        {
+            return;
+        }
+
+        var name = PeriodToDelete.Name;
+        Busy = true;
+        try
+        {
+            await Api.DeletePeriodAsync(PeriodToDelete.Id);
+            CloseDelete();
+            await Toast.SuccessAsync($"Periodo '{name}' eliminado.");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await Toast.ErrorAsync(ex.Message);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    /// <summary>Singular o plural, para que el mensaje se lea bien con cualquier cantidad.</summary>
+    private static string Plural(string singular, string plural, int count) =>
+        count == 1 ? $"1 {singular}" : $"{count} {plural}";
 }

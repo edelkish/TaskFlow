@@ -17,12 +17,32 @@ public class PeriodRepository : GenericRepository<Period>, IPeriodRepository
             .FirstOrDefaultAsync(p => p.Month == month && p.Year == year);
     }
 
-    public async Task<IEnumerable<Period>> GetOrderedDescAsync()
+    public async Task<Period?> GetWithRelatedAsync(Guid id)
     {
         return await _context.Periods
+            .Include(p => p.TaskGroups)
+            .Include(p => p.ImportBatches)
+            .FirstOrDefaultAsync(p => p.Id == id);
+    }
+
+    public async Task<IReadOnlyList<Period>> GetOrderedDescWithRelatedAsync()
+    {
+        return await _context.Periods
+            .Include(p => p.TaskGroups)
+            .Include(p => p.ImportBatches)
             .OrderByDescending(p => p.Year)
             .ThenByDescending(p => p.Month)
             .ToListAsync();
+    }
+
+    public Task<int> CountTaskGroupsAsync(Guid periodId)
+    {
+        return _context.TaskGroups.CountAsync(g => g.PeriodId == periodId);
+    }
+
+    public Task<int> CountImportBatchesAsync(Guid periodId)
+    {
+        return _context.ImportBatches.CountAsync(b => b.PeriodId == periodId);
     }
 }
 

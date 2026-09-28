@@ -45,4 +45,43 @@ public class PeriodsController : ControllerBase
 
         return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
     }
+
+    /// <summary>
+    /// Solo actualiza el nombre. Anio y mes se ignoran aunque venir en el cuerpo: son la
+    /// identidad del periodo y moverlos reubicaria sus grupos y tareas.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = AppPolicies.MasterDataWrite)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePeriodDto dto)
+    {
+        var result = await _periodService.UpdateAsync(id, dto);
+        if (!result.IsSuccess)
+        {
+            return result.Error!.Contains("no encontrado", StringComparison.OrdinalIgnoreCase)
+                ? NotFound(result.Error)
+                : BadRequest(result.Error);
+        }
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Un periodo con grupos o importaciones no se borra: el servicio responde 400 con el
+    /// detalle de cuanto hay que quitar antes. Las tareas del mes son historico de
+    /// planificacion, asi que la decision de borrarlas o reubicarlas es del usuario.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AppPolicies.MasterDataWrite)]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var result = await _periodService.DeleteAsync(id);
+        if (!result.IsSuccess)
+        {
+            return result.Error!.Contains("no encontrado", StringComparison.OrdinalIgnoreCase)
+                ? NotFound(result.Error)
+                : BadRequest(result.Error);
+        }
+
+        return NoContent();
+    }
 }

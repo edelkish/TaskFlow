@@ -5,7 +5,32 @@ namespace TaskFlow.Domain.Interfaces;
 public interface IPeriodRepository : IGenericRepository<Period>
 {
     Task<Period?> GetByMonthYearAsync(int month, int year);
-    Task<IEnumerable<Period>> GetOrderedDescAsync();
+
+    /// <summary>
+    /// Un periodo con sus colecciones cargadas, para que los contadores del DTO no salgan
+    /// en cero. Sin esto GetAsync devolveria GroupCount e ImportCount a 0 aunque el periodo
+    /// tenga contenido, porque las colecciones llegan vacias en lugar de con datos.
+    /// </summary>
+    Task<Period?> GetWithRelatedAsync(Guid id);
+
+    /// <summary>
+    /// Periodos del mas reciente al mas antiguo, con sus colecciones de grupos e
+    /// importaciones cargadas para poder contarlas en memoria. Se.Include en una sola
+    /// consulta en lugar de un conteo por periodo, que seria un N+1.
+    /// </summary>
+    Task<IReadOnlyList<Period>> GetOrderedDescWithRelatedAsync();
+
+    /// <summary>
+    /// Cuantos grupos de tareas cuelgan del periodo. Las tareas llegan por aqui:
+    /// Period -> TaskGroup -> PlanningTask, no hay FK directa de la tarea al periodo.
+    /// </summary>
+    Task<int> CountTaskGroupsAsync(Guid periodId);
+
+    /// <summary>
+    /// Cuantas importaciones se hicieron para el periodo. La FK esta en Restrict, asi que
+    /// esto tambien impide el borrado aunque el periodo no tenga grupos.
+    /// </summary>
+    Task<int> CountImportBatchesAsync(Guid periodId);
 }
 
 public interface IPersonRepository : IGenericRepository<Person>

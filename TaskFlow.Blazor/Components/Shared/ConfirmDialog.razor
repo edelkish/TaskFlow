@@ -1,0 +1,123 @@
+@* Dialogo de confirmacion reutilizable, sin JavaScript.
+
+   Bootstrap ya esta cargado (index.html), pero su componente Modal hay que abrirlo y
+   cerrarlo con JS desde codigo. Hacerlo desde Blazor obliga a mantener sincronizado el
+   "esta abierto" de C# con el backdrop que inyecta Bootstrap, y cuando esa sincronia se
+   rompe quedan capas pegadas que tapan la pantalla. Aqui el estado vive solo en C#: se
+   pinta el markup ya en estado "show" y se quita. Sin interop y sin residuos.
+
+   No hay soporte de tecla Escape porque eso si exigiria JS; se cierra con el boton de
+   cancelar, con la X o haciendo clic en el fondo. *@
+
+@if (Show)
+{
+    <div class="modal-backdrop fade show" @onclick="CancelAsync"></div>
+
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="@_titleId">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="@_titleId">
+                        @if (!string.IsNullOrEmpty(Icon))
+                        {
+                            <i class="bi @Icon me-2"></i>
+                        }
+                        @Title
+                    </h5>
+                    <button type="button" class="btn-close" aria-label="Cerrar" disabled="@Busy" @onclick="CancelAsync"></button>
+                </div>
+
+                <div class="modal-body">
+                    @* Texto de bloqueo: la razon por la que la accion no va a ser posible.
+                       Aparece antes de que el usuario pulse nada, no como error despues. *@
+                    @if (!string.IsNullOrWhiteSpace(BlockingText))
+                    {
+                        <div class="alert alert-warning d-flex" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <div>@BlockingText</div>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(Message))
+                    {
+                        <p class="mb-0 @(BlockingText is null ? "" : "mt-0") text-pre-line">@Message</p>
+                    }
+
+                    @ChildContent
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" disabled="@Busy" @onclick="CancelAsync">
+                        @CancelText
+                    </button>
+                    <button type="button" class="btn btn-@ConfirmVariant" disabled="@(Busy || IsBlocked)" @onclick="ConfirmAsync">
+                        @if (Busy)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                        }
+                        @ConfirmText
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly string _titleId = $"confirm-{Guid.NewGuid():N}";
+
+    /// <summary>Si esta en false el dialogo no se pinta. Lo controla quien lo usa.</summary>
+    [Parameter] public bool Show { get; set; }
+
+    [Parameter] public string Title { get; set; } = "Confirmar";
+
+    /// <summary>Explicacion de la consecuencia. Los saltos de linea se respetan.</summary>
+    [Parameter] public string? Message { get; set; }
+
+    /// <summary>
+    /// Motivo por el que la operacion no puede realizarse. Si viene informado se muestra
+    /// como aviso y el boton de confirmar queda deshabilitado.
+    /// </summary>
+    [Parameter] public string? BlockingText { get; set; }
+
+    [Parameter] public string? Icon { get; set; }
+
+    [Parameter] public string ConfirmText { get; set; } = "Confirmar";
+
+    [Parameter] public string CancelText { get; set; } = "Cancelar";
+
+    [Parameter] public string ConfirmVariant { get; set; } = "danger";
+
+    /// <summary>Invierte el paso mientras se guarda, para que el usuario no repita el clic.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    [Parameter] public EventCallback OnConfirm { get; set; }
+
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool IsBlocked => !string.IsNullOrWhiteSpace(BlockingText);
+
+    private async Task ConfirmAsync()
+    {
+        // Doble guardia: el boton ya viene deshabilitado, pero un Enter con el foco en el
+        // dialogo podria disparar la accion aunque visualmente no se pueda.
+        if (IsBlocked || Busy)
+        {
+            return;
+        }
+
+        await OnConfirm.InvokeAsync();
+    }
+
+    private async Task CancelAsync()
+    {
+        if (Busy)
+        {
+            return;
+        }
+
+        await OnCancel.InvokeAsync();
+    }
+}

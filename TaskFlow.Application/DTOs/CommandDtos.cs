@@ -49,6 +49,15 @@ public record CreatePeriodDto
     public string Name { get; init; } = string.Empty;
 }
 
+/// <summary>
+/// Solo el nombre. Anio y mes no son editables a proposito: son la identidad del
+/// periodo, y moverlos reubicaria sus grupos y tareas de un mes a otro.
+/// </summary>
+public record UpdatePeriodDto
+{
+    public string Name { get; init; } = string.Empty;
+}
+
 public record CreatePersonDto
 {
     public string Name { get; init; } = string.Empty;
