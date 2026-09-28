@@ -165,13 +165,16 @@ public class PersonService : IPersonService
         // mensaje de validación; ahora la regla es el par (Apellidos, Nombre) y un
         // mensaje de error es mucho más útil que una excepción.
         //
-        // Solo se consulta si el valor cambia, para no rechazar el guardado de una persona
-        // que ya cumple la regla y solo esta cambiando otra cosa.
-        if (lastName != person.LastName)
+        // Se comprueba cuando cambia cualquiera de los dos, no solo el apellido: si solo
+        // cambia el nombre y el apellido se mantiene, el par nuevo puede ser el de otra
+        // persona. La comprobación llega con el id propio para que la persona editada no
+        // se cuente a sí misma.
+        var name = dto.Name.Trim();
+        if (lastName != person.LastName || name != person.Name)
         {
-            var duplicate = await _unitOfWork.People.ExistsWithNameAndLastNameAsync(dto.Name, lastName);
+            var duplicate = await _unitOfWork.People.ExistsWithNameAndLastNameAsync(name, lastName, id);
             if (duplicate)
-                return Result<PersonDto>.Failure(AlreadyExistsMessage(dto.Name, lastName));
+                return Result<PersonDto>.Failure(AlreadyExistsMessage(name, lastName));
         }
 
         if (userName != person.UserName)
@@ -181,7 +184,7 @@ public class PersonService : IPersonService
                 return Result<PersonDto>.Failure($"El usuario '{userName}' ya está asignado a otra persona.");
         }
 
-        person.Name = dto.Name.Trim();
+        person.Name = name;
         person.LastName = lastName;
         person.UserName = userName;
         person.UserId = dto.UserId;

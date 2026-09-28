@@ -50,16 +50,20 @@ public class PersonRepository : GenericRepository<Person>, IPersonRepository
             .ToListAsync();
     }
 
-    public async Task<bool> ExistsWithNameAndLastNameAsync(string name, string? lastName)
+    public async Task<bool> ExistsWithNameAndLastNameAsync(string name, string? lastName, Guid? excludingId = null)
     {
         // La comparación de nombre hereda la collation CI_AI de la columna. Para el
         // apellido, null se traduce solo a "LastName IS NULL", que es exactamente lo
         // que distingue a dos homimos sin apellidos de los que si los tienen.
+        //
+        // excludingId permite comprobar el par durante una edición sin que la propia
+        // persona se cuente a sí misma, igual que en ExistsWithUserNameAsync.
         var trimmedName = name.Trim();
         var trimmedLastName = string.IsNullOrWhiteSpace(lastName) ? null : lastName.Trim();
 
         return await _context.People.AnyAsync(p =>
-            p.Name == trimmedName && p.LastName == trimmedLastName);
+            p.Name == trimmedName && p.LastName == trimmedLastName
+            && (excludingId == null || p.Id != excludingId));
     }
 
     public async Task<bool> ExistsWithUserNameAsync(string? userName, Guid? excludingId = null)

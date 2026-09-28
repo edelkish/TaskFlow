@@ -18,7 +18,7 @@ public interface IPersonRepository : IGenericRepository<Person>
     Task<IReadOnlyList<Person>> GetAllByNameCaseInsensitiveAsync(string name);
 
     /// <summary>Indica si ya existe una persona con ese nombre y apellidos.</summary>
-    Task<bool> ExistsWithNameAndLastNameAsync(string name, string? lastName);
+    Task<bool> ExistsWithNameAndLastNameAsync(string name, string? lastName, Guid? excludingId = null);
 
     /// <summary>Indica si el usuario ya está tomado por otra persona.</summary>
     Task<bool> ExistsWithUserNameAsync(string? userName, Guid? excludingId = null);
