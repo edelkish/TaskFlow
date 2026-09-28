@@ -74,7 +74,29 @@ Razón: si fuera bloqueante, el día que hay que planificar el mes y el grupo to
 desactualizado, **no podrías reportar nada**. Un warning deja trabajar y dice qué limpiar. La idea es
 promoverlo a error más adelante, cuando los datos estén depurados.
 
-## 1.4 Período vs. Backlog: una sola tabla ✅
+## 1.4 Cómo se identifica a una persona en el TXT
+
+El TXT trae **un solo token** por persona (`Dev: Angel`), así que el import empareja por
+`People.Name`. Como el nombre ya no es único —la identidad de una persona es el par
+`(Apellidos, Nombre)`—, esa búsqueda puede encontrar **varias** filas. Es el caso
+`PersonAmbiguous`, y es un **error bloqueante**:
+
+```
+Bloque 1: 'Angel' (Dev) corresponde a 2 personas: Angel Perez, Angel Soto.
+```
+
+Elegir una al azar asignaría el trabajo a la persona equivocada, que es peor que rechazar el
+archivo. La resolución es curarlo en **Personas**: dar a cada una un nombre propio.
+
+Los selectores de la interfaz muestran nombre y apellidos juntos (`Angel Perez`) por lo mismo: con
+dos homónimos, `@p.Name` a secas haría imposible distinguirlos.
+
+Los apellidos son opcionales a propósito: el TXT no los trae, así que un alta hecha desde la
+importación o una ficha antigua los tendrá a `NULL`. Dos homónimos **ambos sin apellidos** siguen
+sin poder coexistir, porque en un índice único de SQL Server los `NULL` se consideran iguales y esa
+es la garantía que ya existía.
+
+## 1.5 Período vs. Backlog: una sola tabla ✅
 
 Antes había dos entidades para "tarea" y ninguna se usaba. Ahora hay una, y **la regla que las
 distingue es `TaskGroupId`**:
@@ -95,7 +117,7 @@ Las tareas de período son **histórico de un mes**: describen qué se hizo en a
 > Por qué el KPI "Tareas planificadas" del dashboard antes siempre daba 0: leía `TaskItem`, una tabla
 > huérfana que nadie llenaba. Ahora cuenta backlog real.
 
-## 1.5 Permisos: reportar no es curar ✅
+## 1.6 Permisos: reportar no es curar ✅
 
 | Acción | Admin | Planificación | TeamLead | QA | Developer |
 |---|:---:|:---:|:---:|:---:|:---:|
@@ -107,7 +129,7 @@ La idea: el Developer prepara su trabajo pero **no reporta** (para que no se alt
 asignó) y **no toca maestros**. Planificación cura maestros y también puede reportar, aunque no sea
 Dev ni QA. TeamLead y QA reportan porque son responsables del trabajo del mes.
 
-## 1.6 El pipeline, etapa por etapa
+## 1.7 El pipeline, etapa por etapa
 
 ```
 TXT ──► ① PARSER ──► ② VALIDADOR ──► ③ ESCRITURA ──► ④ LOTE
@@ -126,6 +148,7 @@ en el primero.
 | `PeriodNotFound` — el mes no está creado | `PersonNotInDevGroup` — Dev/QA fuera del equipo |
 | `ProjectRequired` / `NotFound` / `Inactive` | `UnrecognizedLine` — línea rara, se importa igual |
 | `PersonNotFound` / `PersonInactive` | `IgnoredLine` — texto suelto |
+| `PersonAmbiguous` — el nombre corresponde a varias personas | |
 | `MissingRole` — la persona no tiene el cargo que el archivo le exige | |
 | `BlockWithoutTasks` / `FileEmpty` | |
 
