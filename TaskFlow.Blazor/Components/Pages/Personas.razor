@@ -37,16 +37,20 @@
                             <h6 class="mb-3">Nueva persona</h6>
                             <form class="needs-validation" novalidate @ref="_createForm">
                                 <div class="row g-2">
-                                    <div class="col-md-5">
+                                    <div class="col-md-3">
                                         <label class="form-label">Nombre</label>
                                         <input type="text" class="form-control" maxlength="120" required @bind="NewName" />
                                         <div class="invalid-feedback">El nombre es obligatorio.</div>
                                     </div>
                                     <div class="col-md-3">
-                                        <label class="form-label">Usuario (Id)</label>
-                                        <input type="text" class="form-control" placeholder="Opcional" @bind="NewUserId" />
+                                        <label class="form-label">Apellidos</label>
+                                        <input type="text" class="form-control" maxlength="120" placeholder="Opcional" @bind="NewLastName" />
                                     </div>
-                                    <div class="col-md-4 d-flex align-items-end">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Usuario</label>
+                                        <input type="text" class="form-control" maxlength="120" placeholder="Opcional" @bind="NewUserName" />
+                                    </div>
+                                    <div class="col-md-3 d-flex align-items-end">
                                         <button type="button" class="btn btn-primary btn-sm" disabled="@Busy" @onclick="CreateAsync">
                                             <i class="bi bi-check-lg me-1"></i> Guardar
                                         </button>
@@ -60,135 +64,142 @@
 
                 <div class="table-responsive">
                     <table class="table table-hover table-striped align-middle">
-                            <thead>
-                                <tr>
-                                    <th>Nombre</th>
-                                    <th>Cargos</th>
-                                    <th>Vinculado a usuario</th>
-                                    <th class="text-end">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @if (People == null || People.Count == 0)
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Apellidos</th>
+                                <th>Usuario</th>
+                                <th>Cargos</th>
+                                <th>Vinculado a usuario</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (People == null || People.Count == 0)
+                            {
+                                <tr><td colspan="6" class="text-center text-secondary">No hay personas registradas.</td></tr>
+                            }
+                            else
+                            {
+                                @foreach (var per in People!)
                                 {
-                                    <tr><td colspan="4" class="text-center text-secondary">No hay personas registradas.</td></tr>
-                                }
-                                else
-                                {
-                                    @foreach (var per in People!)
+                                    <tr>
+                                        <td>@per.Name</td>
+                                        <td>@(string.IsNullOrWhiteSpace(per.LastName) ? "—" : per.LastName)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(per.UserName) ? "—" : per.UserName)</td>
+                                        <td>
+                                            @if (Roles == null || Roles.Count == 0)
+                                            {
+                                                <span class="text-secondary">—</span>
+                                            }
+                                            else if (per.Roles.Count == 0)
+                                            {
+                                                <span class="badge text-bg-danger">
+                                                    <i class="bi bi-exclamation-triangle me-1"></i>Sin cargo
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                @foreach (var cargo in per.Roles)
+                                                {
+                                                    <span class="badge text-bg-primary me-1">@cargo</span>
+                                                }
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (per.UserId != null)
+                                            {
+                                                <span class="badge text-bg-info">@per.UserId</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-secondary">—</span>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            @if (AuthState.CanEditMasterData)
+                                            {
+                                                <button class="btn btn-sm btn-outline-primary" @onclick="() => ToggleEdit(per)">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-info" title="Cargos" @onclick="() => ToggleRoles(per)">
+                                                    <i class="bi bi-briefcase"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(per)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-secondary">—</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                    @if (Edit != null && Edit.Id == per.Id)
                                     {
                                         <tr>
-                                            <td>@per.Name</td>
-                                            <td>
-                                                @if (Roles == null || Roles.Count == 0)
-                                                {
-                                                    <span class="text-secondary">—</span>
-                                                }
-                                                else if (per.Roles.Count == 0)
-                                                {
-                                                    <span class="badge text-bg-danger">
-                                                        <i class="bi bi-exclamation-triangle me-1"></i>Sin cargo
-                                                    </span>
-                                                }
-                                                else
-                                                {
-                                                    @foreach (var cargo in per.Roles)
-                                                    {
-                                                        <span class="badge text-bg-primary me-1">@cargo</span>
-                                                    }
-                                                }
-                                            </td>
-                                            <td>
-                                                @if (per.UserId != null)
-                                                {
-                                                    <span class="badge text-bg-info">@per.UserId</span>
-                                                }
-                                                else
-                                                {
-                                                    <span class="text-secondary">—</span>
-                                                }
-                                            </td>
-                                            <td class="text-end">
-                                                @if (AuthState.CanEditMasterData)
-                                                {
-                                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ToggleEdit(per)">
-                                                        <i class="bi bi-pencil"></i>
-                                                    </button>
-                                                    <button class="btn btn-sm btn-outline-info" title="Cargos" @onclick="() => ToggleRoles(per)">
-                                                        <i class="bi bi-briefcase"></i>
-                                                    </button>
-                                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(per)">
-                                                        <i class="bi bi-trash"></i>
-                                                    </button>
-                                                }
-                                                else
-                                                {
-                                                    <span class="text-secondary">—</span>
-                                                }
+                                            <td colspan="6">
+                                                <form class="needs-validation" novalidate @ref="_editForm">
+                                                    <div class="row g-2">
+                                                        <div class="col-md-3">
+                                                            <input type="text" class="form-control form-control-sm" maxlength="120" required @bind="EditName" />
+                                                            <div class="invalid-feedback">El nombre es obligatorio.</div>
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <input type="text" class="form-control form-control-sm" maxlength="120" placeholder="Apellidos" @bind="EditLastName" />
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <input type="text" class="form-control form-control-sm" maxlength="120" placeholder="Usuario" @bind="EditUserName" />
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <button type="button" class="btn btn-sm btn-success" @onclick="() => SaveEditAsync(per)">
+                                                                <i class="bi bi-check-lg"></i>
+                                                            </button>
+                                                            <button type="button" class="btn btn-sm btn-secondary ms-1" @onclick="CancelEdit">
+                                                                <i class="bi bi-x-lg"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </form>
                                             </td>
                                         </tr>
-                                        @if (Edit != null && Edit.Id == per.Id)
-                                        {
-                                            <tr>
-                                                <td colspan="4">
-                                                    <form class="needs-validation" novalidate @ref="_editForm">
-                                                        <div class="row g-2">
-                                                            <div class="col-md-5">
-                                                                <input type="text" class="form-control form-control-sm" maxlength="120" required @bind="EditName" />
-                                                                <div class="invalid-feedback">El nombre es obligatorio.</div>
-                                                            </div>
-                                                            <div class="col-md-3">
-                                                                <input type="text" class="form-control form-control-sm" placeholder="Usuario (Id)" @bind="EditUserId" />
-                                                            </div>
-                                                            <div class="col-md-4">
-                                                                <button type="button" class="btn btn-sm btn-success" @onclick="() => SaveEditAsync(per)">
-                                                                    <i class="bi bi-check-lg"></i>
-                                                                </button>
-                                                                <button type="button" class="btn btn-sm btn-secondary ms-1" @onclick="CancelEdit">
-                                                                    <i class="bi bi-x-lg"></i>
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        }
-                                        @if (RolesEdit != null && RolesEdit.Id == per.Id)
-                                        {
-                                            <tr>
-                                                <td colspan="4">
-                                                    <div class="mb-2"><strong>Cargos de @per.Name</strong></div>
-                                                    <div class="mb-2">
-                                                        @if (Roles == null || Roles.Count == 0)
+                                    }
+                                    @if (RolesEdit != null && RolesEdit.Id == per.Id)
+                                    {
+                                        <tr>
+                                            <td colspan="6">
+                                                <div class="mb-2"><strong>Cargos de @per.FullName</strong></div>
+                                                <div class="mb-2">
+                                                    @if (Roles == null || Roles.Count == 0)
+                                                    {
+                                                        <span class="text-secondary">No hay cargos definidos.</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        foreach (var cargo in Roles)
                                                         {
-                                                            <span class="text-secondary">No hay cargos definidos.</span>
+                                                            <div class="form-check form-check-inline">
+                                                                <input class="form-check-input" type="checkbox" id="@($"rol-{cargo.Id}")"
+                                                                       checked="@SelectedRoleIds.Contains(cargo.Id)"
+                                                                       @onchange="e => ToggleRole(cargo.Id, (bool)(e.Value ?? false))" />
+                                                                <label class="form-check-label" for="@($"rol-{cargo.Id}")">
+                                                                    @cargo.Name
+                                                                    <span class="text-secondary">(@cargo.PersonCount)</span>
+                                                                </label>
+                                                            </div>
                                                         }
-                                                        else
-                                                        {
-                                                            foreach (var cargo in Roles)
-                                                            {
-                                                                <div class="form-check form-check-inline">
-                                                                    <input class="form-check-input" type="checkbox" id="@($"rol-{cargo.Id}")"
-                                                                           checked="@SelectedRoleIds.Contains(cargo.Id)"
-                                                                           @onchange="e => ToggleRole(cargo.Id, (bool)(e.Value ?? false))" />
-                                                                    <label class="form-check-label" for="@($"rol-{cargo.Id}")">
-                                                                        @cargo.Name
-                                                                        <span class="text-secondary">(@cargo.PersonCount)</span>
-                                                                    </label>
-                                                                </div>
-                                                            }
-                                                        }
-                                                    </div>
-                                                    <button class="btn btn-sm btn-success" disabled="@Busy" @onclick="() => SaveRolesAsync(per)">
-                                                        <i class="bi bi-check-lg me-1"></i> Guardar cargos
-                                                    </button>
-                                                    <button class="btn btn-sm btn-secondary ms-1" @onclick="CancelRoles">Cancelar</button>
-                                                </td>
-                                            </tr>
-                                        }
+                                                    }
+                                                </div>
+                                                <button class="btn btn-sm btn-success" disabled="@Busy" @onclick="() => SaveRolesAsync(per)">
+                                                    <i class="bi bi-check-lg me-1"></i> Guardar cargos
+                                                </button>
+                                                <button class="btn btn-sm btn-secondary ms-1" @onclick="CancelRoles">Cancelar</button>
+                                            </td>
+                                        </tr>
                                     }
                                 }
-                            </tbody>
+                            }
+                        </tbody>
                     </table>
                 </div>
                 }
@@ -207,11 +218,13 @@
     private bool Busy { get; set; }
 
     private string NewName { get; set; } = string.Empty;
-    private string NewUserId { get; set; } = string.Empty;
+    private string NewLastName { get; set; } = string.Empty;
+    private string NewUserName { get; set; } = string.Empty;
 
     private TaskFlow.Application.DTOs.PersonDto? Edit { get; set; }
     private string EditName { get; set; } = string.Empty;
-    private string EditUserId { get; set; } = string.Empty;
+    private string EditLastName { get; set; } = string.Empty;
+    private string EditUserName { get; set; } = string.Empty;
 
     private TaskFlow.Application.DTOs.PersonDto? RolesEdit { get; set; }
     private HashSet<Guid> SelectedRoleIds { get; set; } = new();
@@ -291,7 +304,7 @@
                 RoleIds = SelectedRoleIds.ToList()
             });
             CancelRoles();
-            await Toast.SuccessAsync($"Cargos de {person.Name} actualizados.");
+            await Toast.SuccessAsync($"Cargos de {person.FullName} actualizados.");
             await LoadAsync();
         }
         catch (Exception ex)
@@ -317,11 +330,13 @@
             await Api.CreatePersonAsync(new TaskFlow.Application.DTOs.CreatePersonDto
             {
                 Name = NewName.Trim(),
-                UserId = string.IsNullOrWhiteSpace(NewUserId) ? null : NewUserId.Trim()
+                LastName = string.IsNullOrWhiteSpace(NewLastName) ? null : NewLastName.Trim(),
+                UserName = string.IsNullOrWhiteSpace(NewUserName) ? null : NewUserName.Trim()
             });
             ShowCreate = false;
             NewName = string.Empty;
-            NewUserId = string.Empty;
+            NewLastName = string.Empty;
+            NewUserName = string.Empty;
             await Toast.SuccessAsync("Persona creada correctamente.");
             await LoadAsync();
         }
@@ -344,7 +359,8 @@
         }
         Edit = person;
         EditName = person.Name;
-        EditUserId = person.UserId ?? string.Empty;
+        EditLastName = person.LastName ?? string.Empty;
+        EditUserName = person.UserName ?? string.Empty;
     }
 
     private void CancelEdit()
@@ -365,7 +381,11 @@
             await Api.UpdatePersonAsync(person.Id, new TaskFlow.Application.DTOs.UpdatePersonDto
             {
                 Name = EditName.Trim(),
-                UserId = string.IsNullOrWhiteSpace(EditUserId) ? null : EditUserId.Trim()
+                LastName = string.IsNullOrWhiteSpace(EditLastName) ? null : EditLastName.Trim(),
+                UserName = string.IsNullOrWhiteSpace(EditUserName) ? null : EditUserName.Trim(),
+                // El UserId se reenvía sin tocar porque ya no se edita a mano: si no se
+                // mandaría, el guardado de la ficha borraría el vínculo con el login.
+                UserId = person.UserId
             });
             CancelEdit();
             await Toast.SuccessAsync("Persona actualizada correctamente.");

@@ -63,7 +63,7 @@
                                 <option value="">Sin filtro</option>
                                 @foreach (var p in People)
                                 {
-                                    <option value="@p.Id">@p.Name</option>
+                                    <option value="@p.Id">@p.FullName</option>
                                 }
                             </select>
                         </div>
@@ -106,7 +106,7 @@
                                                 <option value="">Sin asignar</option>
                                                 @foreach (var p in People)
                                                 {
-                                                    <option value="@p.Id">@p.Name</option>
+                                                    <option value="@p.Id">@p.FullName</option>
                                                 }
                                             </select>
                                         </div>
@@ -163,7 +163,7 @@
                                                         <option value="">Sin asignar</option>
                                                         @foreach (var p in People)
                                                         {
-                                                            <option value="@p.Id">@p.Name</option>
+                                                            <option value="@p.Id">@p.FullName</option>
                                                         }
                                                     </select>
                                                 }

@@ -153,7 +153,7 @@
                                                        id="member-@p.Id"
                                                        checked="@SelectedMemberIds.Contains(p.Id)"
                                                        @onchange="(e) => ToggleMember(p.Id, (bool?)e.Value == true)" />
-                                                <label class="form-check-label" for="member-@p.Id">@p.Name</label>
+                                                <label class="form-check-label" for="member-@p.Id">@p.FullName</label>
                                             </div>
                                         </div>
                                     }
