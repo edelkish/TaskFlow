@@ -369,6 +369,14 @@ Tasks:                      → empieza la captura del bloque
    2.1- Layout base AdminLTE→ Number=2, SubNumber=1
 3. Accesibilidad            → Number=3
    3.1- Contraste AA...     → Number=3, SubNumber=1</code></pre>
+                <p class="mt-3">
+                    <i class="bi bi-exclamation-triangle me-1 text-warning"></i>
+                    Cuando un nombre se <strong>repite</strong> (dos personas llamadas <code>Angel</code>),
+                    la validación bloquea el archivo y avisa. Para desambiguar, escribe en el TXT el
+                    <strong>nombre completo</strong> (p. ej. <code>Dev: Angel Perez</code>) o el
+                    <strong>usuario del sistema</strong> (p. ej. <code>Dev: a.perez</code>): la búsqueda
+                    mira el nombre, el nombre completo y el usuario.
+                </p>
                 <p class="mt-3">Nótese tres cosas del parser que hacen la vida fácil:</p>
                 <ul>
                     <li><code>Team Leade:</code> sin la <code>r</code> final → se acepta (y también <code>Team Lead:</code>)</li>

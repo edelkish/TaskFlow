@@ -251,7 +251,7 @@ public class ImportService : IImportService
             return null;
         }
 
-        var matches = await _unitOfWork.People.GetAllByNameCaseInsensitiveAsync(name.Trim());
+        var matches = await _unitOfWork.People.ResolvePersonCandidatesAsync(name.Trim());
 
         // La validación previa ya bloquea el archivo ante nombres ambiguos, así que llegar
         // aquí con más de una coincidencia significa que se saltó esa validación. Se lanza
@@ -260,7 +260,7 @@ public class ImportService : IImportService
         if (matches.Count > 1)
         {
             var candidates = string.Join(", ", matches
-                .Select(m => PersonDisplayName.For(m.Name, m.LastName)));
+                .Select(m => DescribeCandidate(m)));
 
             throw new InvalidOperationException(
                 $"La persona '{name.Trim()}' es ambigua: corresponde a {matches.Count} personas ({candidates}). "
@@ -279,6 +279,18 @@ public class ImportService : IImportService
 
         return string.Join(Environment.NewLine, ordered.Select(f =>
             f.Line > 0 ? $"[L{f.Line}] {f.Message}" : f.Message));
+    }
+
+    /// <summary>
+    /// Mismo formato de candidato que ImportValidator: nombre completo y, si existe,
+    /// el usuario del sistema, que es la clave natural para desambiguar sin ambiguedad.
+    /// </summary>
+    private static string DescribeCandidate(Person person)
+    {
+        var display = PersonDisplayName.For(person.Name, person.LastName);
+        return string.IsNullOrWhiteSpace(person.UserName)
+            ? $"'{display}'"
+            : $"'{display}' (usuario: {person.UserName})";
     }
 
     public async Task<IEnumerable<ImportBatchDto>> GetBatchesAsync(CancellationToken cancellationToken = default)

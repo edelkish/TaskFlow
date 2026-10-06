@@ -216,7 +216,7 @@ public class ImportValidator : IImportValidator
 
         if (!personCache.TryGetValue(name, out var matches))
         {
-            matches = (await _unitOfWork.People.GetAllByNameCaseInsensitiveAsync(name)).ToList();
+            matches = (await _unitOfWork.People.ResolvePersonCandidatesAsync(name)).ToList();
             personCache[name] = matches;
         }
 
@@ -255,7 +255,7 @@ public class ImportValidator : IImportValidator
 
         if (!personCache.TryGetValue(name, out var matches))
         {
-            matches = (await _unitOfWork.People.GetAllByNameCaseInsensitiveAsync(name)).ToList();
+            matches = (await _unitOfWork.People.ResolvePersonCandidatesAsync(name)).ToList();
             personCache[name] = matches;
         }
 
@@ -264,7 +264,9 @@ public class ImportValidator : IImportValidator
             return Error(
                 ImportFindingCode.PersonNotFound, line, group.Index, cargo, name,
                 $"Bloque {group.Index}: la persona '{name}' ({cargo}) no existe.",
-                $"Cree a '{name}' en Personas antes de importar.");
+                $"Cree a '{name}' en Personas antes de importar. Si la persona ya existe pero con "
+                + "apellidos, escribala en el TXT como 'Nombre Apellidos' o con su usuario del "
+                + "sistema, y la busqueda la encontrara.");
         }
 
         // El TXT solo trae un token por persona, así que si ese nombre corresponde a varias
@@ -272,14 +274,13 @@ public class ImportValidator : IImportValidator
         // porque adivinar asignaría el trabajo a la persona equivocada.
         if (matches.Count > 1)
         {
-            var candidates = string.Join(", ", matches
-                .Select(m => PersonDisplayName.For(m.Name, m.LastName)));
+            var candidates = string.Join(", ", matches.Select(DescribeCandidate));
 
             return Error(
                 ImportFindingCode.PersonAmbiguous, line, group.Index, cargo, name,
                 $"Bloque {group.Index}: '{name}' ({cargo}) corresponde a {matches.Count} personas: {candidates}.",
-                $"El TXT solo admite un nombre por persona, así que no puede elegir entre ellas. "
-                + $"Distingalas en Personas con un nombre propio, o edite el bloque para que apunte a una sola.");
+                "Escriba en el TXT el nombre completo (por ejemplo 'Angel Perez') o el usuario del "
+                + "sistema (por ejemplo 'a.perez') de la persona correcta para desambiguar.");
         }
 
         var person = matches[0];
@@ -364,4 +365,17 @@ public class ImportValidator : IImportValidator
             Message = message,
             Resolution = resolution
         };
+
+    /// <summary>
+    /// Como se muestra un candidato cuando un nombre es ambiguo: nombre completo y, si la
+    /// persona tiene, su usuario del sistema. Ese usuario es la clave natural para que el
+    /// usuario del TXT desambigue sin conocer el indice (LastName, Name).
+    /// </summary>
+    private static string DescribeCandidate(Person person)
+    {
+        var display = PersonDisplayName.For(person.Name, person.LastName);
+        return string.IsNullOrWhiteSpace(person.UserName)
+            ? $"'{display}'"
+            : $"'{display}' (usuario: {person.UserName})";
+    }
 }

@@ -36,11 +36,15 @@ public interface IPeriodRepository : IGenericRepository<Period>
 public interface IPersonRepository : IGenericRepository<Person>
 {
     /// <summary>
-    /// Todas las personas cuyo nombre coincide, sin distinguir mayusculas ni acentos.
-    /// Puede devolver mas de una: el nombre ya no es clave unica y quien llama debe
+    /// Personas que coinciden con el texto que escribe alguien en el TXT, sin distinguir
+    /// mayusculas ni acentos (las tres columnas llevan collation CI_AI). El texto puede
+    /// ser el nombre solo ("Angel"), el usuario del sistema ("a.perez") o el nombre
+    /// completo ("Angel Perez"), y se buscan los tres en una sola consulta.
+    ///
+    /// Puede devolver mas de una: el nombre solo ya no es clave unica, y quien llama debe
     /// detectar la ambiguedad en lugar de quedarse con la primera.
     /// </summary>
-    Task<IReadOnlyList<Person>> GetAllByNameCaseInsensitiveAsync(string name);
+    Task<IReadOnlyList<Person>> ResolvePersonCandidatesAsync(string raw);
 
     /// <summary>Indica si ya existe una persona con ese nombre y apellidos.</summary>
     Task<bool> ExistsWithNameAndLastNameAsync(string name, string? lastName, Guid? excludingId = null);

@@ -52,19 +52,21 @@ public class PersonRepository : GenericRepository<Person>, IPersonRepository
     {
     }
 
-    public async Task<IReadOnlyList<Person>> GetAllByNameCaseInsensitiveAsync(string name)
+    public async Task<IReadOnlyList<Person>> ResolvePersonCandidatesAsync(string raw)
     {
-        // La columna People.Name usa la collation Latin1_General_CI_AI, así que la
-        // comparación directa ya es insensible a mayúsculas y acentos, coincide con el
-        // índice único y además es sargable. Usar ToLower() rompía esa concordancia:
-        // "José" y "Jose" no empataban en la consulta pero sí colisionaban en el índice.
+        // Las columnas People.Name, LastName y UserName usan collation Latin1_General_CI_AI,
+        // asi que la comparacion directa ya es insensible a mayusculas y acentos, coincide
+        // con los indices y es sargable. Usar ToLower() rompia esa concordancia: "José" y
+        // "Jose" no empataban en la consulta pero si colisionaban en el indice.
         //
-        // Devuelve todas las coincidencias en lugar de la primera: desde que el nombre
-        // único es (LastName, Name) puede haber varias, y elegir una a ciegas asignaria
-        // el bloque del TXT a la persona equivocada.
-        var trimmed = name.Trim();
+        // Un solo OR en lugar de tres consultas independientes: una persona puede matchear
+        // por mas de una via (UserName "angel" y Name "angel" a la vez) y el OR la devuelve
+        // una sola vez en el conjunto de resultados.
+        var trimmed = raw.Trim();
         return await _context.People
-            .Where(p => p.Name == trimmed)
+            .Where(p => p.UserName == trimmed
+                     || (p.Name + " " + p.LastName) == trimmed
+                     || p.Name == trimmed)
             .OrderBy(p => p.LastName)
             .ThenBy(p => p.Id)
             .ToListAsync();
