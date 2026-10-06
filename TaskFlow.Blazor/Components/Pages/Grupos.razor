@@ -20,7 +20,7 @@
                         <option value="">Todos los periodos</option>
                         @foreach (var p in Periods ?? new())
                         {
-                            <option value="@p.Id">@p.Name — @p.Year @(new System.Globalization.CultureInfo("es-ES").DateTimeFormat.GetMonthName(p.Month))</option>
+                            <option value="@p.Id">@p.Label()</option>
                         }
                     </select>
                     @if (AuthState.CanEditMasterData)
@@ -52,7 +52,7 @@
                                             <option value="">Seleccione periodo...</option>
                                             @foreach (var p in Periods ?? new())
                                             {
-                                                <option value="@p.Id">@($"{p.Name} — {p.Year} {new System.Globalization.CultureInfo("es-ES").DateTimeFormat.GetMonthName(p.Month)}")</option>
+                                                <option value="@p.Id">@p.Label()</option>
                                             }
                                         </select>
                                         <div class="invalid-feedback">Seleccione el periodo.</div>
